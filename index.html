@@ -367,12 +367,12 @@ const hsl2rgb=(h,s,l)=>{s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l)
 const rgbHex=c=>'#'+c.map(x=>x.toString(16).padStart(2,'0')).join('');
 const lum=c=>{const [r,g,b]=c.map(x=>{x/=255;return x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4);});return .2126*r+.7152*g+.0722*b;};
 const THEME_DEFS=[
-  {k:'blau',n:'Blau',hex:'#1c6fe8'},
+  {k:'blau',n:'Blau',h:217},
   {k:'gelb',n:'Gelb',h:48,a:[100,50]},{k:'hellgelb',n:'Hellgelb',h:48,light:1},
   {k:'grau',n:'Grau',h:215,gray:1,a:[100,48]},{k:'hellgrau',n:'Hellgrau',h:215,gray:1,light:1},
   {k:'gruen',n:'Grün',h:145,a:[85,38]},{k:'hellgruen',n:'Hellgrün',h:110,light:1},
   {k:'hellblau',n:'Hellblau',h:205,light:1},
-  {k:'lila',n:'Lila',orig:1,hex:'#4a3fe0'},{k:'helllila',n:'Helllila',h:255,light:1},
+  {k:'lila',n:'Lila',orig:1,hex:'#8c83ff'},{k:'helllila',n:'Helllila',h:255,light:1},
   {k:'orange',n:'Orange',h:27,a:[100,50]},{k:'hellorange',n:'Hellorange',h:27,light:1},
   {k:'rosa',n:'Rosa',h:330,a:[90,58]},{k:'hellrosa',n:'Hellrosa',h:330,light:1},
   {k:'rot',n:'Rot',h:4,a:[85,50]},{k:'hellrot',n:'Hellrot',h:4,light:1},
@@ -380,15 +380,16 @@ const THEME_DEFS=[
   {k:'weiss',n:'Weiß',hex:'#ffffff',white:1}
 ];
 function accOf(t){
-  if(t.light)return [90,72];
-  return t.a||[95,52];
+  return t.light?[90,72]:[100,68];
 }
 function themeVars(k){
-  const t=THEME_DEFS.find(x=>x.k===k);if(!t||t.k==='blau')return null;
-  if(t.orig)return {'--bg':'#f2f0fb','--surface':'#ffffff','--surface-2':'#e9e6f8','--ink':'#1c1a3a','--muted':'#67648d','--line':'#d9d5f0','--accent':'#4a3fe0','--accent-2':'#8c83ff','--accent-dark':'#2c2599','--accent-ink':'#ffffff','--accent-text':'#4a3fe0','--accent-soft':'#e4e1fb','--shadow':'0 1px 0 rgba(28,26,58,.06),0 6px 18px rgba(28,26,58,.07)','color-scheme':'light'};
+  const t=THEME_DEFS.find(x=>x.k===k);if(!t)return null;
+  if(t.orig)return {'--bg':'#13112a','--surface':'#1e1b3d','--surface-2':'#2a2650','--ink':'#f0eeff','--muted':'#a5a2cc','--line':'#37326a','--accent':'#8c83ff','--accent-2':'#b3adff','--accent-dark':'#3d35b8','--accent-ink':'#13112a','--accent-text':'#8c83ff','--accent-soft':'#2e2a63','--good':'#4cd49b','--good-bg':'#12352a','--bad':'#ff8077','--bad-bg':'#401a1a','--warn':'#ffd36b','--warn-bg':'#3d3010','--shadow':'0 6px 18px rgba(0,0,0,.35)','color-scheme':'dark'};
   if(t.dark)return {'--bg':'#0b0b0c','--surface':'#1a1a1c','--surface-2':'#27272b','--ink':'#f2f2f2','--muted':'#a2a2aa','--line':'#36363c','--accent':'#f2f2f2','--accent-2':'#cfcfd6','--accent-dark':'#6b6b74','--accent-ink':'#0b0b0c','--accent-text':'#f2f2f2','--accent-soft':'#2d2d33','--good':'#4cd49b','--good-bg':'#12352a','--bad':'#ff8077','--bad-bg':'#401a1a','--warn':'#ffd36b','--warn-bg':'#3d3010','--shadow':'0 6px 18px rgba(0,0,0,.5)','color-scheme':'dark'};
   if(t.white)return {'--bg':'#ffffff','--surface':'#f3f4f6','--surface-2':'#e8eaee','--ink':'#1c1c1e','--muted':'#666b73','--line':'#d9dce2','--accent':'#3a3d44','--accent-2':'#6b7078','--accent-dark':'#1c1c1e','--accent-ink':'#ffffff','--accent-text':'#1c1c1e','--accent-soft':'#e8eaee','--shadow':'0 1px 0 rgba(0,0,0,.05),0 6px 18px rgba(0,0,0,.08)','color-scheme':'light'};
   const g=t.gray?(t.light?.2:.32):1,H=t.h,P=(s,l,hh)=>`hsl(${hh===undefined?H:hh} ${Math.round(s*g)}% ${l}%)`;
+  if(!t.light){const d=(s,l,hh)=>`hsl(${hh===undefined?H:hh} ${Math.round(s*g)}% ${l}%)`;
+    return {'--bg':d(67,11),'--surface':d(60,18),'--surface-2':d(57,25),'--ink':d(100,96),'--muted':d(40,74),'--line':d(48,32),'--accent':d(100,68),'--accent-2':d(100,76,(H+343)%360),'--accent-dark':d(73,38),'--accent-ink':d(80,9),'--accent-text':d(100,68),'--accent-soft':d(60,28),'--good':'#4cd49b','--good-bg':'#12352a','--bad':'#ff8077','--bad-bg':'#401a1a','--warn':'#ffd36b','--warn-bg':'#3d3010','--shadow':'0 6px 18px rgba(0,0,0,.4)','color-scheme':'dark'};}
   const [as,al]=accOf(t);
   const [bs,bl,s2s,s2l,ls,ll,ss,sl,ds,dl]=t.light?[60,98,60,95,45,91,80,94,70,42]:[100,95,90,90,70,84,100,89,95,28];
   const acc=hsl2rgb(H,as*g,al),ink=lum(acc)>.22?P(60,10):'#ffffff';
