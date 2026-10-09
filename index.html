@@ -1,0 +1,1164 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Wörter-Sammler</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1c6fe8">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+/* Konzept: Sammelalbum auf dem Handy in Blau. Große Tippflächen, ruhige Oberfläche, Gold nur für Belohnungen. */
+:root{
+  --bg:#eef4fd;--surface:#fff;--surface-2:#e1ebfa;--ink:#0f2144;--muted:#566a8c;--line:#cfdcf0;
+  --accent:#1c6fe8;--accent-2:#38b6ff;--accent-dark:#0b3a8f;--accent-ink:#fff;--accent-soft:#d9e8fd;
+  --gold:#f5b800;--gold-ink:#3a2a00;
+  --good:#147a52;--good-bg:#dcf4e8;--bad:#c4352b;--bad-bg:#fde4e1;--warn:#7d5200;--warn-bg:#fff0c4;
+  --r-n:#7d8fae;--r-s:#0e9f8f;--r-e:#7a3fd9;--r-l:#e0a000;
+  --shadow:0 1px 0 rgba(15,33,68,.06),0 6px 18px rgba(15,33,68,.08);
+  --font:"Nunito","SF Pro Rounded",ui-rounded,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0a1530;--surface:#12234a;--surface-2:#1b2f63;--ink:#eaf1ff;--muted:#9db0d6;--line:#2a4079;
+  --accent:#5aa2ff;--accent-2:#7fd0ff;--accent-dark:#1a4aa8;--accent-ink:#06142e;--accent-soft:#1d3a75;
+  --good:#4cd49b;--good-bg:#12352a;--bad:#ff8077;--bad-bg:#401a1a;--warn:#ffd36b;--warn-bg:#3d3010;
+  --shadow:0 6px 18px rgba(0,0,0,.4);color-scheme:dark}
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 var(--font);-webkit-tap-highlight-color:transparent}
+#app{max-width:560px;margin:0 auto;padding:calc(12px + env(safe-area-inset-top)) 16px calc(92px + env(safe-area-inset-bottom))}
+body.immersive #app{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+body.immersive nav{display:none}
+h1,h2,h3{margin:0 0 6px;line-height:1.2}
+h2{font-size:22px}h3{font-size:17px}
+p{margin:0 0 10px}
+.muted{color:var(--muted)}.center{text-align:center}.sm{font-size:13px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row>*{min-width:0}
+.spread{justify-content:space-between}
+.grow{flex:1}
+.panel{background:var(--surface);border-radius:18px;padding:16px;box-shadow:var(--shadow);margin:12px 0}
+.btn{appearance:none;border:0;border-radius:14px;padding:12px 18px;font:inherit;font-weight:800;font-size:17px;background:var(--surface-2);color:var(--ink);cursor:pointer;min-height:52px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.gold{background:var(--gold);color:var(--gold-ink)}
+.btn.danger{background:var(--bad-bg);color:var(--bad)}
+.btn.small{min-height:40px;padding:8px 14px;font-size:15px}
+.btn.block{display:flex;width:100%}
+.btn[disabled]{opacity:.45;pointer-events:none}
+button:focus-visible,.in:focus-visible,.chip:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{appearance:none;border:2px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:8px 16px;font:inherit;font-weight:800;white-space:nowrap;cursor:pointer;min-height:42px}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.seg button{appearance:none;border:2px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:10px 8px;font:inherit;font-weight:800;font-size:16px;min-height:56px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.seg svg,.mic svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.seg svg{width:22px;height:22px}
+.bar{height:16px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .4s}
+.bar.gold>i{background:linear-gradient(90deg,#f5b800,#ff9d3d)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+.stat{background:var(--surface);border-radius:14px;padding:10px;text-align:center;box-shadow:var(--shadow)}
+.stat b{display:block;font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted);font-weight:700}
+.pill{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--ink);border-radius:99px;padding:4px 12px;font-weight:800;font-size:14px}
+.pill.gold{background:var(--warn-bg);color:var(--warn)}
+.pill.ok{background:var(--good-bg);color:var(--good)}
+.badge{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 7px;border-radius:99px;background:var(--gold);color:var(--gold-ink);font-weight:900;font-size:14px}
+.packbox{display:flex;gap:14px;align-items:center}
+.packimg{position:relative;flex:none;width:68px}
+.packimg img{display:block;width:100%;height:auto;filter:drop-shadow(0 4px 6px rgba(0,0,0,.3))}
+.packimg .badge{position:absolute;right:-10px;top:-8px;z-index:1}
+.packdef{width:100%;aspect-ratio:307/560;border-radius:10px;background:linear-gradient(160deg,var(--accent),var(--accent-dark));position:relative;box-shadow:0 4px 0 rgba(0,0,0,.18)}
+.packdef::after{content:"";position:absolute;inset:8%;border:2px solid rgba(255,255,255,.55);border-radius:6px}
+.packbig{display:block;margin:14px auto;background:none;border:0;padding:0;width:min(62vw,250px);cursor:pointer;animation:wobble 1.8s ease-in-out infinite}
+.packbig img{display:block;width:100%;height:auto;filter:drop-shadow(0 10px 14px rgba(0,0,0,.35))}
+@keyframes wobble{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}
+.subhead{width:100%;appearance:none;border:0;background:var(--accent-soft);color:var(--ink);font:inherit;font-weight:900;font-size:16px;padding:12px 14px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-top:18px;cursor:pointer;min-height:48px}
+/* Formulare */
+.field{margin:0 0 12px}
+.field>label{display:block;font-weight:800;font-size:14px;margin-bottom:4px;color:var(--muted)}
+.in{width:100%;border:2px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:12px 14px;font:inherit;font-size:17px;min-height:48px}
+textarea.in{resize:vertical;min-height:120px}
+.in:focus{border-color:var(--accent);outline:none}
+.chk{display:flex;gap:10px;align-items:center;margin:0 0 12px;font-weight:700;min-height:44px}
+.chk input{width:22px;height:22px;accent-color:var(--accent)}
+.tog{appearance:none;border:0;border-radius:99px;padding:8px 14px;font:inherit;font-weight:800;font-size:14px;min-height:40px;background:var(--surface-2);color:var(--muted);cursor:pointer;flex:none}
+.tog.on{background:var(--good-bg);color:var(--good)}
+/* Lernen */
+.qtop{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+.icon-btn{appearance:none;border:0;background:var(--surface);color:var(--ink);width:44px;height:44px;border-radius:12px;font-size:20px;font-weight:900;cursor:pointer;box-shadow:var(--shadow);flex:none}
+.qcard{background:var(--surface);border-radius:22px;padding:26px 18px;text-align:center;box-shadow:var(--shadow);margin-bottom:14px}
+.qlabel{font-size:14px;font-weight:800;color:var(--muted);margin-bottom:8px}
+.qword{font-size:clamp(30px,9vw,44px);font-weight:900;line-height:1.15;overflow-wrap:anywhere;text-wrap:balance}
+.qhint{margin-top:12px;font:800 22px/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em;white-space:pre;color:var(--accent);overflow-x:auto}
+.ans{font-size:22px;font-weight:800;text-align:center;min-height:60px}
+.mic{appearance:none;border:0;width:112px;height:112px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;margin:4px auto 10px;cursor:pointer;box-shadow:0 6px 0 rgba(0,0,0,.18)}
+.mic svg{width:50px;height:50px}
+.mic.on{background:var(--bad);color:#fff;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(1.08)}}
+.fb{border-radius:18px;padding:16px;margin-bottom:14px;font-weight:700}
+.fb h3{font-size:22px;margin-bottom:4px}
+.fb.right{background:var(--good-bg);color:var(--good)}
+.fb.almost{background:var(--warn-bg);color:var(--warn)}
+.fb.wrong{background:var(--bad-bg);color:var(--bad)}
+.fb .corr{font-size:24px;font-weight:900;color:var(--ink);overflow-wrap:anywhere}
+.big{font-size:56px;font-weight:900;line-height:1}
+/* Vokabelliste */
+.lt{padding:0;overflow:hidden}
+.lrow{display:grid;grid-template-columns:1.1fr 1.1fr .8fr;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);align-items:center;overflow-wrap:anywhere}
+.lrow:last-child{border:0}
+.lhead{background:var(--accent-soft);position:sticky;top:env(safe-area-inset-top,0px);z-index:2}
+.lhead button{appearance:none;border:0;background:none;color:var(--ink);font:inherit;font-weight:900;font-size:14px;text-align:left;padding:6px 0;cursor:pointer;min-height:40px}
+/* Karten */
+.tcard{position:relative;aspect-ratio:63/88;border-radius:11px;background:#fff;overflow:hidden;border:3px solid var(--rc,var(--r-n));box-shadow:0 3px 0 rgba(0,0,0,.14)}
+.tcard img{width:100%;height:100%;object-fit:contain;display:block;background:#fff}
+.tcard .cap{position:absolute;left:0;right:0;bottom:0;padding:14px 6px 5px;background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff;font-size:12px;font-weight:800;line-height:1.15;display:flex;justify-content:space-between;gap:4px;align-items:flex-end}
+.tcard .cap span{color:#ffd45c;white-space:nowrap}
+.tcard .cnt{position:absolute;right:5px;top:5px}
+.tcard .new{position:absolute;left:5px;top:5px;background:#e8332a;color:#fff;font-weight:900;font-size:11px;border-radius:99px;padding:2px 8px}
+.tcard.rw{background:linear-gradient(160deg,var(--surface),var(--surface-2));color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;padding:14px 8px}
+.tcard.rw .rl{font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--rc)}
+.tcard.rw .rt{font-size:16px;font-weight:900;line-height:1.2;overflow-wrap:anywhere}
+.tcard.rw .st{color:#e0a000;font-size:14px}
+.tcard.r-l::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.55) 45%,transparent 60%);background-size:250% 100%;animation:shine 3s linear infinite;pointer-events:none}
+.tcard.unk{background:var(--surface-2);border-color:var(--line);display:grid;place-items:center;color:var(--muted);font-weight:900;box-shadow:none}
+.tcard.unk b{font-size:28px;display:block;text-align:center}
+.r-n{--rc:var(--r-n)}.r-s{--rc:var(--r-s)}.r-e{--rc:var(--r-e)}.r-l{--rc:var(--r-l)}
+@keyframes shine{from{background-position:150% 0}to{background-position:-100% 0}}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid button.tile{appearance:none;border:0;background:none;padding:0;cursor:pointer;color:inherit;font:inherit;text-align:left}
+.packgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+.flip{appearance:none;border:0;background:none;padding:0;perspective:900px;aspect-ratio:63/88;cursor:pointer;width:100%}
+.flip-in{position:relative;width:100%;height:100%;transition:transform .6s;transform-style:preserve-3d}
+.flip.on .flip-in{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:11px}
+.face.front{transform:rotateY(180deg)}
+.face.back{background:radial-gradient(circle at 50% 50%,#fff 0 11%,transparent 12%),radial-gradient(circle at 50% 50%,transparent 0 22%,rgba(255,255,255,.55) 23% 25%,transparent 26%),repeating-linear-gradient(45deg,rgba(255,255,255,.12) 0 9px,transparent 9px 18px),linear-gradient(160deg,var(--accent),var(--accent-dark));border:3px solid rgba(255,255,255,.7);box-shadow:0 3px 0 rgba(0,0,0,.2)}
+.flip.on.hi .face.front{animation:glow 1.4s ease-out}
+@keyframes glow{0%{box-shadow:0 0 0 0 var(--r-l)}40%{box-shadow:0 0 28px 8px var(--r-l)}100%{box-shadow:0 0 0 0 transparent}}
+/* Navigation */
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);z-index:5}
+nav div{max-width:560px;margin:0 auto;display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+nav button{flex:1;appearance:none;border:0;background:none;color:var(--muted);font:inherit;font-size:12px;font-weight:800;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:12px;cursor:pointer;min-height:54px}
+nav button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--accent);background:var(--accent-soft)}
+/* Eltern */
+.sechead{width:100%;appearance:none;border:0;background:var(--surface);color:var(--ink);font:inherit;font-weight:900;font-size:18px;padding:14px 16px;border-radius:16px;text-align:left;display:flex;justify-content:space-between;margin-top:10px;box-shadow:var(--shadow);cursor:pointer;min-height:52px;align-items:center}
+.secbody{background:var(--surface);border-radius:0 0 16px 16px;padding:14px 16px;margin-top:-10px;box-shadow:var(--shadow)}
+.sechead.on{border-radius:16px 16px 0 0;position:relative;z-index:1}
+.urow{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.urow:last-child{border:0}
+.urow .t{flex:1;min-width:0;overflow-wrap:anywhere}
+.wrow{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:15px}
+.wrow .t{flex:1;min-width:0;overflow-wrap:anywhere}
+.x{appearance:none;border:0;background:var(--bad-bg);color:var(--bad);border-radius:10px;width:36px;height:36px;font-weight:900;cursor:pointer;flex:none}
+.x.edit{background:var(--accent-soft);color:var(--accent)}
+.note{font-size:13px;color:var(--muted)}
+.busy{background:var(--warn-bg);color:var(--warn);border-radius:12px;padding:8px 12px;font-weight:800;margin:8px 0}
+.modal{position:fixed;inset:0;background:rgba(5,12,32,.74);display:grid;place-items:center;padding:16px;z-index:20;overflow-y:auto}
+.mbox{background:var(--surface);border-radius:20px;padding:18px;width:100%;max-width:340px}
+#toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-weight:800;font-size:15px;z-index:30;max-width:90vw;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<nav><div>
+  <button data-a="nav" data-v="home" id="n-home"><svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/></svg>Lernen</button>
+  <button data-a="nav" data-v="album" id="n-album"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="12" height="16" rx="2"/><path d="M9 21h10a1 1 0 0 0 1-1V8"/></svg>Album</button>
+  <button data-a="nav" data-v="parent" id="n-parent"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Eltern</button>
+</div></nav>
+<div id="toast" role="status"></div>
+<script>
+'use strict';
+/* ================= LOGIK (ohne Oberfläche, wird separat getestet) ================= */
+//LOGIC-START
+const DAY=86400000;
+const BOX_DAYS=[0,0,1,3,7,14];
+const RARITIES=[
+  {k:'n',label:'Normal',w:62,stars:1},
+  {k:'s',label:'Selten',w:26,stars:2},
+  {k:'e',label:'Episch',w:10,stars:3},
+  {k:'l',label:'Legendär',w:2,stars:4}
+];
+function norm(s){
+  return String(s).normalize('NFC').toLowerCase().trim().replace(/[.!?¡¿,]+$/g,'').replace(/\s+/g,' ').trim();
+}
+function variants(ans){
+  const out=new Set();
+  String(ans).split(/\s*[\/;]\s*/).forEach(part=>{
+    part=part.trim(); if(!part) return;
+    const forms=[part,part.replace(/\([^)]*\)/g,' '),part.replace(/[()]/g,'')];
+    forms.forEach(f=>{
+      const n=norm(f); if(!n) return;
+      out.add(n);
+      if(n.startsWith('to ')) out.add(n.slice(3));
+    });
+  });
+  return [...out];
+}
+function lev(a,b){
+  const m=a.length,n=b.length; if(!m) return n; if(!n) return m;
+  let prev=Array.from({length:n+1},(_,j)=>j);
+  for(let i=1;i<=m;i++){
+    const cur=[i];
+    for(let j=1;j<=n;j++){
+      cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));
+    }
+    prev=cur;
+  }
+  return prev[n];
+}
+function checkAnswer(input,answer){
+  const x=norm(input); if(!x) return 'wrong';
+  const vs=variants(answer);
+  if(vs.includes(x)) return 'right';
+  for(const v of vs){
+    const tol=v.length>=8?2:(v.length>=4?1:0);
+    if(tol&&lev(x,v)<=tol) return 'almost';
+  }
+  return 'wrong';
+}
+/* Gesprochene Antwort: mehrere Erkennungsvarianten; ein ganzes Wort im Satz zählt ("the dog"). */
+function evalSpeech(alts,answer){
+  let best='wrong';
+  const vs=variants(answer);
+  for(const t of alts){
+    const k=checkAnswer(t,answer);
+    if(k==='right') return 'right';
+    const x=' '+norm(t)+' ';
+    if(vs.some(v=>x.includes(' '+v+' '))) return 'right';
+    if(k==='almost') best='almost';
+  }
+  return best;
+}
+function dueFor(box,now){return box<=1?now:now+BOX_DAYS[box]*DAY}
+function applyFirstTry(w,kind,hinted,now){
+  w.seen=(w.seen||0)+1;
+  if(kind==='right'&&!hinted){w.right=(w.right||0)+1;w.box=Math.min(5,(w.box||1)+1);w.due=dueFor(w.box,now);}
+  else if(kind==='right'||kind==='almost'){w.due=now;}
+  else{w.wrong=(w.wrong||0)+1;w.box=1;w.due=now;}
+}
+function pickSession(vocab,unit,size,now,rnd){
+  rnd=rnd||Math.random;
+  const pool=vocab.filter(w=>!unit||w.unit===unit);
+  const sc=w=>(6-w.box)*10+Math.min(w.wrong||0,5)*2+((w.seen||0)===0?4:0)+rnd()*8;
+  const due=pool.filter(w=>w.due<=now).map(w=>({w,s:sc(w)})).sort((a,b)=>b.s-a.s).map(o=>o.w);
+  let pick=due.slice(0,size);
+  if(pick.length<size){
+    const rest=pool.filter(w=>w.due>now).map(w=>({w,r:rnd()})).sort((a,b)=>a.w.due-b.w.due||a.r-b.r).map(o=>o.w);
+    pick=pick.concat(rest.slice(0,size-pick.length));
+  }
+  for(let i=pick.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[pick[i],pick[j]]=[pick[j],pick[i]];}
+  return pick.map(w=>w.id);
+}
+/* Karten und Text-Belohnungen liegen im selben Topf; die Seltenheit bestimmt die Wahrscheinlichkeit. */
+function drawCards(items,n,rnd){
+  rnd=rnd||Math.random;
+  let pool=items.slice();const out=[];
+  for(let i=0;i<n;i++){
+    const avail=RARITIES.filter(r=>pool.some(c=>c.rarity===r.k));
+    if(!avail.length) break;
+    const tot=avail.reduce((s,r)=>s+r.w,0);
+    let x=rnd()*tot,pick=avail[avail.length-1];
+    for(const r of avail){if(x<r.w){pick=r;break;}x-=r.w;}
+    const group=pool.filter(c=>c.rarity===pick.k);
+    const it=group[Math.floor(rnd()*group.length)];
+    out.push(it);
+    if(it.once) pool=pool.filter(c=>c!==it);
+  }
+  return out;
+}
+function chances(items){
+  const avail=RARITIES.filter(r=>items.some(i=>i.rarity===r.k));
+  const tot=avail.reduce((s,r)=>s+r.w,0),out={};
+  for(const r of avail){const g=items.filter(i=>i.rarity===r.k);g.forEach(i=>{out[i.id]=r.w/tot/g.length;});}
+  return out;
+}
+function fmtPct(p){const v=p*100;return (v>=10?String(Math.round(v)):v.toFixed(1).replace('.',','))+' %';}
+function addPoints(L,n){
+  let packs=0; L.points+=n; L.totalPoints=(L.totalPoints||0)+n;
+  while(L.points>=L.goal){L.points-=L.goal;L.packs++;packs++;}
+  return packs;
+}
+function parseVocab(text){
+  const items=[];let skipped=0;
+  for(const raw of String(text).split(/\r?\n/)){
+    const line=raw.trim(); if(!line) continue;
+    const m=line.match(/^(.+?)\s*(?:=|\t|\s[-–—]\s)\s*(.+)$/);
+    if(!m){skipped++;continue;}
+    const f=m[1].trim(),d=m[2].trim();
+    if(!f||!d){skipped++;continue;}
+    items.push({f,d});
+  }
+  return {items,skipped};
+}
+function cleanCardName(fn){
+  const s=String(fn).replace(/\.[^.]+$/,'').replace(/[_\-+]+/g,' ').replace(/\s+/g,' ').trim();
+  if(!s) return 'Karte';
+  return s.replace(/(^|\s)(\S)/g,(m,a,b)=>a+b.toUpperCase());
+}
+function primaryAnswer(a){
+  const first=String(a).split(/\s*[\/;]\s*/)[0]||String(a);
+  return first.replace(/[()]/g,'').trim();
+}
+function hintText(a,h){
+  const p=primaryAnswer(a);let shown=0;
+  return [...p].map(ch=>{if(ch===' ')return ' ';shown++;return shown<=h?ch:'_';}).join(' ');
+}
+/* Sortierung der Vokabelliste: col = 'f' (Fremdsprache), 'd' (Deutsch), 'u' (Kategorie) */
+function sortWords(list,col,dir){
+  const cf=new Intl.Collator('en',{sensitivity:'base',numeric:true}),cd=new Intl.Collator('de',{sensitivity:'base',numeric:true});
+  const fkey=w=>String(w.f).replace(/^to\s+/i,'');
+  const key=w=>col==='d'?w.d:col==='u'?w.unit:fkey(w);
+  const c=col==='f'?cf:cd;
+  return list.slice().sort((a,b)=>(c.compare(key(a),key(b))*dir)||cf.compare(fkey(a),fkey(b)));
+}
+function speechLangFor(name){
+  const n=String(name).toLowerCase();
+  const map=[[/franz|french|fran[cç]/,'fr-FR'],[/spani|spanish|espa/,'es-ES'],[/ital/,'it-IT'],[/deutsch|german/,'de-DE'],
+    [/t[üu]rk/,'tr-TR'],[/poln|polish|polski/,'pl-PL'],[/russ/,'ru-RU'],[/niederl|dutch|nederl/,'nl-NL'],[/portug/,'pt-PT'],[/amerik|american|\bus\b/,'en-US']];
+  for(const [re,code] of map) if(re.test(n)) return code;
+  return 'en-GB';
+}
+function resolveSpeechLang(L){return L.speechLang&&L.speechLang!=='auto'?L.speechLang:speechLangFor(L.name);}
+/* Schwarzen Hintergrund eines Bildes (RGBA-Daten) transparent machen. Gibt [x0,y0,x1,y1] des Inhalts zurück oder null. */
+function cutoutBlack(d,w,h){
+  const lum=i=>d[i*4]+d[i*4+1]+d[i*4+2];
+  const seen=new Uint8Array(w*h),stack=[];
+  const push=i=>{if(!seen[i]&&lum(i)<45){seen[i]=1;stack.push(i);}};
+  for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
+  for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+  let n=0;
+  while(stack.length){const i=stack.pop();n++;const x=i%w,y=(i-x)/w;if(x>0)push(i-1);if(x<w-1)push(i+1);if(y>0)push(i-w);if(y<h-1)push(i+w);}
+  if(n<w*h*0.02) return null;
+  const edge=[];
+  for(let i=0;i<w*h;i++){
+    if(seen[i]||lum(i)>=150) continue;
+    const x=i%w,y=(i-x)/w;
+    if((x>0&&seen[i-1])||(x<w-1&&seen[i+1])||(y>0&&seen[i-w])||(y<h-1&&seen[i+w])) edge.push(i);
+  }
+  edge.forEach(i=>{seen[i]=1;});
+  let x0=w,y0=h,x1=-1,y1=-1;
+  for(let i=0;i<w*h;i++){
+    if(seen[i]){d[i*4+3]=0;continue;}
+    const x=i%w,y=(i-x)/w;
+    if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;
+  }
+  return x1<0?null:[x0,y0,x1+1,y1+1];
+}
+/* Serien-Belohnungen: r.days = Länge, r.every = alle X Tage statt nur bei Tag X */
+function matchStreak(count,rewards){
+  return rewards.filter(r=>r.active!==false&&(r.every?(count>0&&count%r.days===0):count===r.days));
+}
+function nextStreakTarget(count,rewards){
+  let best=null;
+  for(const r of rewards){
+    if(r.active===false) continue;
+    const t=r.every?(Math.floor(count/r.days)+1)*r.days:(r.days>count?r.days:null);
+    if(t!==null&&(best===null||t<best)) best=t;
+  }
+  return best;
+}
+function migrate(s){
+  s.mode=s.mode==='speak'?'speak':'write';
+  s.rewards=Array.isArray(s.rewards)?s.rewards:[];
+  s.streakRewards=Array.isArray(s.streakRewards)?s.streakRewards:[];
+  s.streak=s.streak||{last:null,count:0};
+  s.langs.forEach(l=>{
+    l.wins=l.wins||[];l.owned=l.owned||{};l.cards=l.cards||[];l.vocab=l.vocab||[];
+    l.speechLang=(!l.speechLang||l.speechLang==='auto'||l.speechLang===speechLangFor(l.name))?'auto':l.speechLang;
+    l.goal=l.goal||100;l.ppr=l.ppr||10;l.packSize=l.packSize||3;l.sessionSize=l.sessionSize||10;l.dir=l.dir||'mix';
+    l.points=l.points||0;l.packs=l.packs||0;l.totalPoints=l.totalPoints||0;
+  });
+  if(!s.langs.find(l=>l.id===s.activeLang)) s.activeLang=s.langs[0]?s.langs[0].id:null;
+  return s;
+}
+//LOGIC-END
+
+/* ================= Hilfen ================= */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-3);
+const rar=k=>RARITIES.find(r=>r.k===k)||RARITIES[0];
+const SRClass=()=>window.SpeechRecognition||window.webkitSpeechRecognition||null;
+const fmtDate=ts=>new Date(ts).toLocaleDateString('de-DE');
+function dateKey(off){const d=new Date();d.setDate(d.getDate()+(off||0));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function hashPin(p){let h=5381;const s='ws|'+p;for(let i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0;return String(h);}
+let toastT;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600);}
+const ICON_PEN='<svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/></svg>';
+const PACK_KEY='packimg';
+const packPic=()=>IMG[PACK_KEY]?`<img src="${IMG[PACK_KEY]}" alt="Päckchen">`:`<div class="packdef"></div>`;
+const winLabel=w=>w.src==='streak'?'Serie · '+w.days+' Tage':rar(w.rarity).label;
+const ICON_MIC='<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+
+/* ================= Daten ================= */
+const KEY='woerter-sammler-v1';
+function newLang(name){
+  return {id:uid(),name,dir:'mix',sessionSize:10,goal:100,packSize:3,ppr:10,speechLang:'auto',points:0,totalPoints:0,packs:0,vocab:[],cards:[],owned:{},wins:[]};
+}
+function seed(){
+  const L=newLang('Englisch');
+  const ex=[['dog','Hund'],['cat','Katze'],['house','Haus'],['apple','Apfel'],['red','rot'],['school','Schule'],['book','Buch'],['friend','Freund'],['water','Wasser'],['to run','rennen']];
+  ex.forEach(([f,d])=>L.vocab.push({id:uid(),f,d,unit:'Beispiel (bitte löschen)',box:1,due:0,seen:0,right:0,wrong:0}));
+  return migrate({v:1,pinHash:null,mode:'write',rewards:[],streakRewards:[],streak:{last:null,count:0},activeLang:L.id,langs:[L]});
+}
+function load(){
+  try{const r=localStorage.getItem(KEY);if(r){const s=JSON.parse(r);if(s&&Array.isArray(s.langs))return migrate(s);}}catch(e){}
+  return seed();
+}
+let S=load();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Speichern nicht möglich');}}
+const curLang=()=>S.langs.find(l=>l.id===S.activeLang)||S.langs[0]||null;
+const unitsOf=L=>[...new Set(L.vocab.map(w=>w.unit))];
+const rewardsFor=L=>S.rewards.filter(r=>r.active&&(r.lang==='all'||r.lang===L.id));
+
+/* Bilder in IndexedDB */
+let db=null;const IMG={},BLOBS={};
+function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open('woerter-sammler',1);r.onupgradeneeded=()=>r.result.createObjectStore('img');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+function idbTx(mode,fn){return new Promise((res,rej)=>{if(!db)return rej(new Error('kein Speicher'));const tx=db.transaction('img',mode);const rq=fn(tx.objectStore('img'));tx.oncomplete=()=>res(rq&&rq.result);tx.onerror=()=>rej(tx.error);tx.onabort=()=>rej(tx.error);});}
+const idbPut=(k,b)=>idbTx('readwrite',s=>s.put(b,k));
+const idbDel=k=>idbTx('readwrite',s=>s.delete(k));
+const idbClear=()=>idbTx('readwrite',s=>s.clear());
+function idbAll(){return new Promise((res,rej)=>{if(!db)return res({});const out={};const tx=db.transaction('img');const rq=tx.objectStore('img').openCursor();rq.onsuccess=()=>{const c=rq.result;if(c){out[c.key]=c.value;c.continue();}else res(out);};rq.onerror=()=>rej(rq.error);});}
+async function putImg(id,blob){
+  BLOBS[id]=blob;if(IMG[id])URL.revokeObjectURL(IMG[id]);IMG[id]=URL.createObjectURL(blob);
+  try{await idbPut(id,blob);}catch(e){toast('Bild konnte nicht dauerhaft gespeichert werden');}
+}
+async function delImg(id){delete BLOBS[id];if(IMG[id]){URL.revokeObjectURL(IMG[id]);delete IMG[id];}try{await idbDel(id);}catch(e){}}
+async function fileToBlob(file,maxSide){
+  maxSide=maxSide||520;
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('Bild nicht lesbar'));i.src=url;});
+    const sc=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+    const w=Math.max(1,Math.round(img.naturalWidth*sc)),h=Math.max(1,Math.round(img.naturalHeight*sc));
+    const c=document.createElement('canvas');c.width=w;c.height=h;
+    const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,w,h);g.drawImage(img,0,0,w,h);
+    return await new Promise(res=>c.toBlob(res,'image/jpeg',0.86));
+  }finally{URL.revokeObjectURL(url);}
+}
+async function packImageBlob(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('Bild nicht lesbar'));i.src=url;});
+    const sc=Math.min(1,900/Math.max(img.naturalWidth,img.naturalHeight));
+    const w=Math.max(1,Math.round(img.naturalWidth*sc)),h=Math.max(1,Math.round(img.naturalHeight*sc));
+    const c=document.createElement('canvas');c.width=w;c.height=h;
+    const g=c.getContext('2d');g.drawImage(img,0,0,w,h);
+    const id=g.getImageData(0,0,w,h);
+    const box=cutoutBlack(id.data,w,h)||[0,0,w,h];
+    g.putImageData(id,0,0);
+    const bw=box[2]-box[0],bh=box[3]-box[1],k=Math.min(1,640/bh);
+    const o=document.createElement('canvas');o.width=Math.max(1,Math.round(bw*k));o.height=Math.max(1,Math.round(bh*k));
+    o.getContext('2d').drawImage(c,box[0],box[1],bw,bh,0,0,o.width,o.height);
+    return await new Promise(res=>o.toBlob(res,'image/webp',0.88));
+  }finally{URL.revokeObjectURL(url);}
+}
+const STARTER=[
+  ['🦊','Fuchs','n','#ff9a4d'],['🐢','Schildkröte','n','#5dc27a'],['🐙','Oktopus','n','#e5679a'],['🦉','Eule','n','#a98467'],
+  ['🐧','Pinguin','n','#5aa9e6'],['🐬','Delfin','n','#4f86f7'],['🐼','Panda','n','#8e9aaf'],['🐸','Frosch','s','#7bc950'],
+  ['🦋','Schmetterling','s','#b57bee'],['🦁','Löwe','s','#f2b134'],['🦄','Einhorn','e','#ff7fc8'],['🐉','Drache','l','#e5483d']
+];
+function starterBlob(emoji,color){
+  const c=document.createElement('canvas');c.width=360;c.height=504;const g=c.getContext('2d');
+  const gr=g.createLinearGradient(0,0,360,504);gr.addColorStop(0,color);gr.addColorStop(1,'#0f2144');
+  g.fillStyle=gr;g.fillRect(0,0,360,504);
+  g.fillStyle='rgba(255,255,255,.9)';g.beginPath();g.roundRect(28,28,304,380,22);g.fill();
+  g.font='190px system-ui, "Apple Color Emoji", "Noto Color Emoji", sans-serif';g.textAlign='center';g.textBaseline='middle';
+  g.fillStyle='#000';g.fillText(emoji,180,218);
+  return new Promise(res=>c.toBlob(res,'image/jpeg',0.88));
+}
+
+/* ================= Zustand der Oberfläche ================= */
+const ui={view:'home',unit:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:'',ls:{col:'f',dir:1},cats:true};
+let Q=null,deferredInstall=null,confirmT,rec=null;
+
+/* ================= Ansichten ================= */
+function langChips(){
+  if(!S.langs.length) return '';
+  return `<div class="chips" role="tablist">${S.langs.map(l=>`<button class="chip ${l.id===curLang().id?'on':''}" data-a="lang" data-id="${l.id}">${esc(l.name)}</button>`).join('')}</div>`;
+}
+function streakNow(){const s=S.streak;if(!s||!s.last)return 0;return (s.last===dateKey(0)||s.last===dateKey(-1))?s.count:0;}
+
+function vHome(){
+  const L=curLang();
+  if(!L) return `<div class="panel center"><h2>Willkommen!</h2><p class="muted">Lege im Elternbereich eine Sprache an.</p><button class="btn primary" data-a="nav" data-v="parent">Zum Elternbereich</button></div>`;
+  const now=Date.now(),total=L.vocab.length;
+  const dueN=L.vocab.filter(w=>w.due<=now).length,known=L.vocab.filter(w=>w.box>=4).length;
+  const units=unitsOf(L);if(ui.unit&&!units.includes(ui.unit))ui.unit='';
+  const pool=ui.unit?L.vocab.filter(w=>w.unit===ui.unit).length:total;
+  const n=Math.min(L.sessionSize,pool);
+  const pct=Math.min(100,Math.round(L.points/L.goal*100));
+  const st=streakNow(),nextT=nextStreakTarget(st,S.streakRewards);
+  return `${langChips()}
+  <div class="panel">
+    <div class="packbox">
+      <div class="packimg">${packPic()}${L.packs>0?`<span class="badge">${L.packs}</span>`:''}</div>
+      <div class="grow">
+        <h3>${L.packs>0?(L.packs===1?'1 Päckchen wartet!':L.packs+' Päckchen warten!'):'Nächstes Päckchen'}</h3>
+        <div class="bar gold" aria-label="Fortschritt"><i style="width:${pct}%"></i></div>
+        <p class="note" style="margin:6px 0 0">Noch ${L.goal-L.points} Punkte bis zum nächsten Päckchen</p>
+      </div>
+    </div>
+    ${L.packs>0?`<button class="btn gold block" style="margin-top:12px" data-a="open-pack">Päckchen öffnen</button>`:''}
+  </div>
+  ${total?`
+  ${units.length>1?`<div class="chips"><button class="chip ${ui.unit===''?'on':''}" data-a="unit" data-u="">Alle Wörter</button>${units.map(u=>`<button class="chip ${ui.unit===u?'on':''}" data-a="unit" data-u="${esc(u)}">${esc(u)}</button>`).join('')}</div>`:''}
+  <div class="seg" role="group" aria-label="Übungsart">
+    <button class="${S.mode==='write'?'on':''}" data-a="mode" data-m="write">${ICON_PEN} Schreiben</button>
+    <button class="${S.mode==='speak'?'on':''}" data-a="mode" data-m="speak">${ICON_MIC} Sprechen</button>
+  </div>
+  ${S.mode==='speak'&&!SRClass()?`<p class="note">Auf diesem Gerät gibt es keine Spracherkennung. Du sagst das Wort laut und bewertest dich danach selbst.</p>`:''}
+  <button class="btn primary block" style="font-size:20px;min-height:64px" data-a="start">Lernen starten · ${n} Wörter</button>
+  <button class="btn block" style="margin-top:10px" data-a="show-list">Vokabelliste ansehen</button>
+  <div class="stats">
+    <div class="stat"><b>${total}</b><span>Wörter</span></div>
+    <div class="stat"><b>${known}</b><span>sicher gelernt</span></div>
+    <div class="stat"><b>${dueN}</b><span>heute dran</span></div>
+  </div>
+  ${st>0?`<p class="center"><span class="pill gold">Serie: ${st} ${st===1?'Tag':'Tage'}</span>${nextT?`<br><span class="note">Nächste Serien-Belohnung bei ${nextT} Tagen</span>`:''}</p>`:''}`
+  :`<div class="panel center"><h3>Noch keine Vokabeln</h3><p class="muted">Mama oder Papa tragen sie im Elternbereich ein.</p><button class="btn primary" data-a="nav" data-v="parent">Zum Elternbereich</button></div>`}`;
+}
+
+function vList(){
+  const L=curLang();
+  if(!L) return `<div class="panel center"><p>Noch keine Sprache angelegt.</p></div>`;
+  const units=unitsOf(L);if(ui.lf&&!units.includes(ui.lf))ui.lf='';
+  const ws=sortWords(L.vocab.filter(w=>!ui.lf||w.unit===ui.lf),ui.ls.col,ui.ls.dir);
+  const ar=c=>ui.ls.col===c?(ui.ls.dir>0?' ▲':' ▼'):'';
+  return `<div class="row"><button class="icon-btn" data-a="nav" data-v="home" aria-label="Zurück">←</button><h2 class="grow" style="margin:0">Vokabelliste</h2><span class="pill">${ws.length} Wörter</span></div>
+  <div style="height:10px"></div>${langChips()}
+  ${units.length>1?`<div class="chips"><button class="chip ${ui.lf===''?'on':''}" data-a="list-filter" data-u="">Alle Kategorien</button>${units.map(u=>`<button class="chip ${ui.lf===u?'on':''}" data-a="list-filter" data-u="${esc(u)}">${esc(u)}</button>`).join('')}</div>`:''}
+  <div class="panel lt">
+    <div class="lrow lhead"><button data-a="list-sort" data-c="f">${esc(L.name)}${ar('f')}</button><button data-a="list-sort" data-c="d">Deutsch${ar('d')}</button><button data-a="list-sort" data-c="u">Kategorie${ar('u')}</button></div>
+    ${ws.length?ws.map(w=>`<div class="lrow"><b>${esc(w.f)}</b><span>${esc(w.d)}</span><span class="muted sm">${esc(w.unit)}</span></div>`).join(''):'<div class="lrow"><span class="muted">Keine Wörter.</span></div>'}
+  </div>`;
+}
+
+function qLabel(L,dir,speak){
+  if(speak) return 'Sage auf '+esc(L.name)+':';
+  return dir==='f2d'?'Wie heißt das auf Deutsch?':'Wie heißt das auf '+esc(L.name)+'?';
+}
+function vQuiz(){
+  const L=curLang(),it=Q.phase==='fb'?Q.last:Q.queue[0],w=L.vocab.find(x=>x.id===it.id);
+  const speak=Q.mode==='speak',hasSR=!!SRClass();
+  const q=it.dir==='f2d'?w.f:w.d,ans=it.dir==='f2d'?w.d:w.f;
+  const pct=Math.round((Q.total-Q.queue.length)/Q.total*100);
+  let body;
+  if(Q.phase==='ask'&&!speak){
+    body=`<div class="field"><input id="ans" class="in ans" type="text" inputmode="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="Antwort eintippen"></div>
+    <button class="btn primary block" style="min-height:60px;font-size:19px" data-a="check">Prüfen</button>
+    <div class="row" style="margin-top:10px"><button class="btn small grow" data-a="hint">Tipp</button><button class="btn small grow" data-a="skip">Weiß ich nicht</button></div>`;
+  }else if(Q.phase==='ask'&&speak&&hasSR){
+    body=`<button class="mic ${Q.listening?'on':''}" data-a="listen" aria-label="Sprechen">${ICON_MIC}</button>
+    <p class="center ${Q.speechMsg?'':'muted'}" style="font-weight:700">${Q.listening?'Ich höre zu … Sprich jetzt!':(esc(Q.speechMsg)||'Tippe aufs Mikrofon und sag das Wort.')}</p>
+    <div class="row"><button class="btn small grow" data-a="hint">Tipp</button><button class="btn small grow" data-a="skip">Weiß ich nicht</button></div>`;
+  }else if(Q.phase==='ask'&&speak){
+    body=`<p class="center muted">Sag das Wort laut. Dann zeige die Lösung und bewerte dich ehrlich.</p>
+    <button class="btn primary block" style="min-height:60px;font-size:19px" data-a="show-answer">Lösung zeigen</button>`;
+  }else if(Q.phase==='reveal'){
+    body=`<div class="fb almost"><div class="muted" style="font-weight:700">Richtig ist:</div><div class="corr">${esc(ans)}</div></div>
+    <div class="row"><button class="btn primary grow" data-a="self-yes">Hab ich gewusst</button><button class="btn grow" data-a="self-no">Nicht gewusst</button></div>`;
+  }else{
+    const f=Q.fb;
+    const t=f.kind==='right'?(f.retry?'Richtig, gut gemerkt!':'Richtig!'):f.kind==='almost'?'Fast richtig!':'Leider nicht.';
+    const sub=f.kind==='right'?(f.pts?`+${f.pts} Punkte${f.hinted?' (mit Tipp)':''}`:''):
+      (f.dropped?'Das üben wir später weiter.':'Das Wort kommt gleich nochmal.');
+    body=`<div class="fb ${f.kind}"><h3>${t}</h3>${f.heard?`<div class="muted" style="font-weight:700">Verstanden: „${esc(f.heard)}“</div>`:''}${f.kind!=='right'?`<div class="muted" style="font-weight:700">Richtig ist:</div><div class="corr">${esc(ans)}</div>`:''}${sub?`<div style="margin-top:6px">${sub}${f.kind==='almost'&&f.pts?` · +${f.pts} Punkte`:''}</div>`:''}</div>
+    <button id="nextbtn" class="btn primary block" style="min-height:60px;font-size:19px" data-a="next">${Q.queue.length?'Weiter':'Fertig'}</button>`;
+  }
+  return `<div class="qtop"><button class="icon-btn" data-a="quit" aria-label="Beenden">✕</button><div class="bar grow"><i style="width:${pct}%"></i></div><span class="pill">+${Q.earned}</span></div>
+  <div class="qcard"><div class="qlabel">${qLabel(L,it.dir,speak)}</div><div class="qword">${esc(q)}</div>${Q.phase==='ask'&&Q.hint>0?`<div class="qhint">${esc(hintText(ans,Q.hint))}</div>`:''}</div>${body}`;
+}
+
+function vSummary(){
+  const L=curLang();const pct=Math.min(100,Math.round(L.points/L.goal*100));
+  const good=Q.rightFirst/Q.total>=0.8;
+  return `<div class="panel center"><div class="big">${Q.rightFirst}/${Q.total}</div>
+  <h2>${good?'Super gemacht!':'Gut geübt!'}</h2><p class="muted">So viele Wörter hast du gleich beim ersten Mal gewusst.</p>
+  <p><span class="pill gold">+${Q.earned} Punkte</span></p>
+  ${Q.packs?`<div class="packimg" style="margin:6px auto 12px">${packPic()}<span class="badge">${Q.packs}</span></div><p><b>${Q.packs===1?'Du hast ein neues Päckchen verdient!':'Du hast '+Q.packs+' neue Päckchen verdient!'}</b></p>`:''}
+  <div class="bar gold" style="margin:12px 0 6px"><i style="width:${pct}%"></i></div>
+  <p class="note">Noch ${L.goal-L.points} Punkte bis zum nächsten Päckchen</p></div>
+  ${Q.streakAwards&&Q.streakAwards.length?`<div class="panel center"><h3>Serien-Belohnung!</h3>${Q.streakAwards.map(a=>`<p style="margin:4px 0"><b>${a.days} Tage in Folge:</b> ${a.kind==='pack'?(a.packs===1?'1 Päckchen':a.packs+' Päckchen'):esc(a.text)}</p>`).join('')}</div>`:''}
+  ${L.packs>0?`<button class="btn gold block" data-a="open-pack">Päckchen öffnen (${L.packs})</button>`:''}
+  <div class="row" style="margin-top:10px"><button class="btn block grow" data-a="start">Nochmal</button><button class="btn primary block grow" data-a="nav" data-v="home">Fertig</button></div>`;
+}
+
+function cardFace(c,isNew,count){
+  const r=rar(c.rarity);
+  if(c.kind==='reward') return `<div class="tcard rw r-${r.k}"><span class="rl">Belohnung</span><span class="rt">${esc(c.text)}</span><span class="st">${'★'.repeat(r.stars)}</span>${isNew?'<span class="new">NEU</span>':''}</div>`;
+  return `<div class="tcard r-${r.k}"><img src="${IMG[c.id]||''}" alt="${esc(c.name)}">${isNew?'<span class="new">NEU</span>':''}${count>1?`<span class="badge cnt">×${count}</span>`:''}<div class="cap"><div>${esc(c.name)}</div><span>${'★'.repeat(r.stars)}</span></div></div>`;
+}
+function packActions(){
+  const P=ui.pack,L=curLang(),all=P.items.every(i=>i.on);
+  return all?`<div class="row" style="margin-top:6px">${L.packs>0?`<button class="btn gold grow" data-a="open-pack">Nächstes Päckchen (${L.packs})</button>`:''}<button class="btn primary grow" data-a="nav" data-v="album">Zum Album</button></div>`
+  :`<button class="btn block" data-a="flip-all">Alle aufdecken</button>`;
+}
+function vPack(){
+  const P=ui.pack,all=P.items.every(i=>i.on);
+  if(!P.opened) return `<h2 class="center">Dein Päckchen</h2><p class="center muted">Tippe aufs Päckchen, um es zu öffnen.</p>
+  <button class="packbig" data-a="tear" aria-label="Päckchen öffnen">${packPic()}</button>`;
+  return `<h2 class="center">Dein Päckchen</h2><p class="center muted" id="packhint">${all?'Das sind deine neuen Karten!':'Tippe auf die Karten zum Aufdecken.'}</p>
+  <div class="packgrid">${P.items.map((it,i)=>`<button class="flip ${it.on?'on':''} ${it.card.kind==='reward'||it.card.rarity==='e'||it.card.rarity==='l'?'hi':''}" data-a="flip" data-i="${i}" aria-label="Karte ${i+1}"><div class="flip-in"><div class="face back"></div><div class="face front">${cardFace(it.card,it.isNew)}</div></div></button>`).join('')}</div>
+  <div id="packact">${packActions()}</div>`;
+}
+
+function vAlbum(){
+  const L=curLang();
+  if(!L) return `<div class="panel center"><p>Noch keine Sprache angelegt.</p></div>`;
+  const have=L.cards.filter(c=>L.owned[c.id]>0).length;
+  const wins=L.wins.slice().reverse();
+  return `${langChips()}<div class="row spread"><h2>Album</h2><span class="pill">${have} / ${L.cards.length} Karten</span></div>
+  ${wins.length?`<div class="panel"><h3>Meine Belohnungen</h3>${wins.map(w=>`<div class="urow"><div class="t"><b>${esc(w.text)}</b><div class="note">${fmtDate(w.ts)} · ${winLabel(w)}</div></div><span class="pill ${w.redeemed?'ok':'gold'}">${w.redeemed?'eingelöst':'offen'}</span></div>`).join('')}</div>`:''}
+  ${L.cards.length?`<div class="grid" style="margin-top:12px">${L.cards.map((c,i)=>{const n=L.owned[c.id]||0;
+    return n>0?`<button class="tile" data-a="view-card" data-id="${c.id}">${cardFace(c,false,n)}</button>`
+    :`<div class="tcard unk"><b>?<br><small>#${String(i+1).padStart(2,'0')}</small></b></div>`;}).join('')}</div>`
+  :`<div class="panel center"><p>Hier ist noch nichts drin.</p><p class="muted">Mama oder Papa fügen im Elternbereich Karten hinzu.</p></div>`}`;
+}
+
+function secBtn(k,t){return `<button class="sechead ${ui.sec===k?'on':''}" data-a="sec" data-k="${k}"><span>${t}</span><span>${ui.sec===k?'−':'+'}</span></button>`;}
+function confBtn(key,label,cls,attrs){const on=ui.confirm===key;return `<button class="btn small ${on?'danger':cls||''}" ${attrs||''} data-a="${key.split(':')[0]}" data-key="${esc(key)}">${on?'Wirklich?':label}</button>`;}
+const rarOptions=sel=>RARITIES.map(r=>`<option value="${r.k}" ${sel===r.k?'selected':''}>${r.label}</option>`).join('');
+
+function vParent(){
+  if(!ui.unlocked){
+    if(!S.pinHash) return `<div class="panel"><h2>PIN festlegen</h2><p class="muted">Der Elternbereich ist mit einer PIN geschützt, damit nur ihr daran ändern könnt.</p>
+      <div class="field"><label for="pin1">Neue PIN (4 bis 8 Ziffern)</label><input id="pin1" class="in" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></div>
+      <div class="field"><label for="pin2">PIN wiederholen</label><input id="pin2" class="in" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></div>
+      ${ui.pinErr?`<p style="color:var(--bad);font-weight:800">${esc(ui.pinErr)}</p>`:''}
+      <button class="btn primary block" data-a="pin-set">PIN speichern</button></div>`;
+    return `<div class="panel"><h2>Elternbereich</h2><p class="muted">Bitte PIN eingeben.</p>
+      <div class="field"><input id="pin" class="in ans" type="password" inputmode="numeric" maxlength="8" autocomplete="off" aria-label="PIN"></div>
+      ${ui.pinErr?`<p style="color:var(--bad);font-weight:800">${esc(ui.pinErr)}</p>`:''}
+      <button class="btn primary block" data-a="pin-go">Entsperren</button></div>`;
+  }
+  const L=curLang();
+  let h=`<div class="row spread"><h2>Elternbereich</h2><button class="btn small" data-a="lock">Sperren</button></div>${langChips()}`;
+  h+=secBtn('lang','Sprachen');if(ui.sec==='lang')h+=pLang();
+  h+=secBtn('vocab','Vokabeln');if(ui.sec==='vocab')h+=L?pVocab(L):noLang();
+  h+=secBtn('cards','Karten');if(ui.sec==='cards')h+=L?pCards(L):noLang();
+  h+=secBtn('prizes','Spezielle Belohnungen');if(ui.sec==='prizes')h+=L?pPrizes(L):noLang();
+  h+=secBtn('streak','Serien-Belohnungen');if(ui.sec==='streak')h+=pStreak();
+  h+=secBtn('reward','Punkte &amp; Abfrage');if(ui.sec==='reward')h+=L?pReward(L):noLang();
+  h+=secBtn('backup','Sicherung &amp; PIN');if(ui.sec==='backup')h+=pBackup();
+  return h;
+}
+const noLang=()=>`<div class="secbody"><p class="muted">Lege zuerst unter „Sprachen“ eine Sprache an.</p></div>`;
+function pLang(){
+  return `<div class="secbody"><div class="field"><label for="newlang">Neue Sprache</label><div class="row"><input id="newlang" class="in grow" placeholder="z. B. Französisch" maxlength="30"><button class="btn primary" data-a="add-lang">Anlegen</button></div></div>
+  <p class="note">Jede Sprache hat ihre eigenen Vokabeln, Punkte und ihr eigenes Album.</p>
+  ${S.langs.map(l=>`<div class="urow"><div class="t"><b>${esc(l.name)}</b><div class="note">${l.vocab.length} Wörter · ${l.cards.length} Karten</div></div>${confBtn('del-lang:'+l.id,'Löschen','')}</div>`).join('')}</div>`;
+}
+function pVocab(L){
+  const units=unitsOf(L);
+  return `<div class="secbody">
+  <div class="field"><label for="vunit">Kategorie</label><input id="vunit" class="in" list="unitlist" data-input="vunit" value="${esc(ui.vunit)}" placeholder="z. B. Möbel" maxlength="40"><datalist id="unitlist">${units.map(u=>`<option value="${esc(u)}">`).join('')}</datalist></div>
+  <div class="field"><label for="vtext">Vokabeln, eine pro Zeile: Fremdwort = Deutsch</label><textarea id="vtext" class="in" rows="7" data-input="vtext" placeholder="dog = Hund&#10;to run = rennen&#10;trousers = Hose / Hosen">${esc(ui.vtext)}</textarea></div>
+  <p class="note">Mehrere richtige Antworten trennst du mit „/“. Text in Klammern ist optional, z. B. „(to) go“.</p>
+  <button class="btn primary block" data-a="add-vocab">Hinzufügen</button>
+  <button class="subhead" data-a="toggle-cats" aria-expanded="${ui.cats}"><span>Vorhandene Kategorien (${units.length})</span><span>${ui.cats?'−':'+'}</span></button>
+  ${!ui.cats?'':units.length?units.map(u=>{const ws=L.vocab.filter(w=>w.unit===u);const open=ui.openUnit===u;
+    return `<div class="urow" style="flex-wrap:wrap"><div class="t"><b>${esc(u)}</b><div class="note">${ws.length} Wörter</div></div><button class="btn small" data-a="open-unit" data-u="${esc(u)}">${open?'Zuklappen':'Ansehen'}</button><button class="btn small" data-a="rename-unit" data-u="${esc(u)}">Umbenennen</button>${confBtn('del-unit:'+u,'Löschen','')}</div>
+    ${open?ws.map(w=>`<div class="wrow"><div class="t">${esc(w.f)} = ${esc(w.d)}</div><button class="x edit" data-a="edit-word" data-id="${w.id}" aria-label="Wort bearbeiten">✎</button><button class="x" data-a="del-word" data-id="${w.id}" aria-label="Wort löschen">✕</button></div>`).join(''):''}`;}).join(''):'<p class="muted">Noch keine Vokabeln.</p>'}
+  ${L.vocab.length?`<div style="margin-top:14px">${confBtn('reset-learn:x','Lernstand zurücksetzen','')}</div><p class="note">Setzt nur den Lernfortschritt der Wörter zurück. Punkte und Karten bleiben.</p>`:''}
+  </div>`;
+}
+function pCards(L){
+  const cnt=RARITIES.map(r=>`${r.label}: ${L.cards.filter(c=>c.rarity===r.k).length}`).join(' · ');
+  return `<div class="secbody">
+  <div class="field"><label for="imprar">Seltenheit der neuen Karten</label><select id="imprar" class="in" data-change="imprar">${rarOptions(ui.imprar)}</select></div>
+  <label class="btn primary block" for="filein">Bilder aus der Galerie wählen</label>
+  <input id="filein" type="file" accept="image/*" multiple hidden data-change="files">
+  <p class="note">Der Dateiname wird zum Kartennamen. Jede Seltenheit am besten in einem eigenen Schwung hinzufügen.</p>
+  <button class="btn block" data-a="starter">Platzhalter-Karten hinzufügen (12 Tiere)</button>
+  <h3 style="margin-top:18px">Päckchen-Bild</h3>
+  <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><div class="packimg" style="width:56px">${packPic()}</div>
+  <div class="grow"><label class="btn small block" for="packin">${IMG[PACK_KEY]?'Anderes Bild wählen':'Bild wählen'}</label><input id="packin" type="file" accept="image/*" hidden data-change="packimg">
+  ${IMG[PACK_KEY]?`<div style="margin-top:8px">${confBtn('del-packimg:x','Zurücksetzen','block')}</div>`:''}</div></div>
+  <p class="note">Wird auf der Startseite und beim Öffnen der Päckchen gezeigt. Ein schwarzer Hintergrund wird automatisch entfernt. Das Bild bleibt auf diesem Handy und ist in der Sicherung enthalten.</p>
+  <div id="busy" class="busy" ${ui.busy?'':'hidden'}>${esc(ui.busy)}</div>
+  <p class="note" style="margin-top:12px">${L.cards.length} Karten · ${cnt}</p>
+  <div class="grid">${L.cards.map(c=>`<button class="tile" data-a="edit-card" data-id="${c.id}">${cardFace(c,false,0)}</button>`).join('')}</div>
+  </div>`;
+}
+function pPrizes(L){
+  const rs=S.rewards.filter(r=>r.lang==='all'||r.lang===L.id);
+  const ch=chances(L.cards.concat(rs.filter(r=>r.active)));
+  const open=L.wins.filter(w=>!w.redeemed);
+  return `<div class="secbody">
+  <p class="note">Diese Texte können statt einer Karte in einem Päckchen auftauchen. Die Seltenheit bestimmt die Wahrscheinlichkeit, genau wie bei den Karten.</p>
+  <div class="field"><label for="pz-text">Belohnung</label><input id="pz-text" class="in" maxlength="80" placeholder="z. B. Eis essen gehen"></div>
+  <div class="field"><label for="pz-rar">Seltenheit</label><select id="pz-rar" class="in">${rarOptions('s')}</select></div>
+  <div class="field"><label for="pz-scope">Gilt für</label><select id="pz-scope" class="in"><option value="one">nur ${esc(L.name)}</option><option value="all">alle Sprachen</option></select></div>
+  <label class="chk"><input type="checkbox" id="pz-once"> Nur einmal gewinnbar</label>
+  <button class="btn primary block" data-a="add-prize">Hinzufügen</button>
+  <h3 style="margin-top:18px">Hinterlegte Belohnungen</h3>
+  ${rs.length?rs.map(r=>`<div class="urow"><div class="t"><b>${esc(r.text)}</b><div class="note">${rar(r.rarity).label}${r.once?' · einmalig':''}${r.lang==='all'?' · alle Sprachen':''} · ${r.active&&ch[r.id]?'ca. '+fmtPct(ch[r.id])+' pro Karte':'pausiert'}</div></div><button class="tog ${r.active?'on':''}" data-a="toggle-prize" data-id="${r.id}">${r.active?'Aktiv':'Aus'}</button><button class="x edit" data-a="edit-prize" data-id="${r.id}" aria-label="Bearbeiten">✎</button></div>`).join(''):'<p class="muted">Noch keine Belohnungen.</p>'}
+  <h3 style="margin-top:18px">Gewonnen, noch nicht eingelöst</h3>
+  ${open.length?open.map(w=>`<div class="urow"><div class="t"><b>${esc(w.text)}</b><div class="note">${fmtDate(w.ts)} · ${winLabel(w)}</div></div><button class="btn small primary" data-a="redeem" data-id="${w.id}">Eingelöst</button></div>`).join(''):'<p class="muted">Nichts offen.</p>'}
+  </div>`;
+}
+function streakFields(p,r){
+  r=r||{days:5,kind:'pack',packs:1,text:'',every:false};
+  return `<div class="field"><label for="${p}-days">Länge der Serie in Tagen</label><input id="${p}-days" class="in" type="number" inputmode="numeric" min="1" max="365" value="${r.days}"></div>
+  <div class="field"><label for="${p}-kind">Belohnung</label><select id="${p}-kind" class="in" data-change="srkind" data-p="${p}"><option value="pack" ${r.kind==='pack'?'selected':''}>Päckchen</option><option value="text" ${r.kind==='text'?'selected':''}>Sonderbelohnung (Text)</option></select></div>
+  <div class="field" id="${p}-packs-w" ${r.kind==='pack'?'':'hidden'}><label for="${p}-packs">Anzahl Päckchen</label><input id="${p}-packs" class="in" type="number" inputmode="numeric" min="1" max="10" value="${r.packs||1}"></div>
+  <div class="field" id="${p}-text-w" ${r.kind==='text'?'':'hidden'}><label for="${p}-text">Text</label><input id="${p}-text" class="in" maxlength="80" value="${esc(r.text||'')}" placeholder="z. B. Ausflug ins Schwimmbad"></div>
+  <label class="chk"><input type="checkbox" id="${p}-every" ${r.every?'checked':''}> Immer wieder vergeben (alle X Tage statt nur einmal bei Tag X)</label>`;
+}
+function readStreak(p){
+  return {days:clamp(val('#'+p+'-days'),1,365),kind:val('#'+p+'-kind')==='text'?'text':'pack',packs:clamp(val('#'+p+'-packs')||1,1,10),text:val('#'+p+'-text').trim(),every:!!($('#'+p+'-every')&&$('#'+p+'-every').checked)};
+}
+function pStreak(){
+  const rs=S.streakRewards.slice().sort((a,b)=>a.days-b.days);
+  return `<div class="secbody">
+  <p class="note">Wer an mehreren Tagen hintereinander übt, bekommt eine Belohnung. Sie geht an die Sprache, mit der gerade geübt wurde. Aktuelle Serie: ${streakNow()} ${streakNow()===1?'Tag':'Tage'}.</p>
+  ${streakFields('sr')}
+  <button class="btn primary block" data-a="add-streak">Hinzufügen</button>
+  <h3 style="margin-top:18px">Hinterlegte Serien-Belohnungen</h3>
+  ${rs.length?rs.map(r=>`<div class="urow"><div class="t"><b>${r.every?'Alle '+r.days+(r.days===1?' Tag':' Tage'):'Bei '+r.days+(r.days===1?' Tag':' Tagen')}</b><div class="note">${r.kind==='pack'?(r.packs===1?'1 Päckchen':r.packs+' Päckchen'):esc(r.text)}</div></div><button class="tog ${r.active!==false?'on':''}" data-a="toggle-streak" data-id="${r.id}">${r.active!==false?'Aktiv':'Aus'}</button><button class="x edit" data-a="edit-streak" data-id="${r.id}" aria-label="Bearbeiten">✎</button></div>`).join(''):'<p class="muted">Noch keine Serien-Belohnungen.</p>'}
+  </div>`;
+}
+function pReward(L){
+  const sl=[['auto','Automatisch (passend zur Sprache)'],['en-GB','Englisch (UK)'],['en-US','Englisch (US)'],['fr-FR','Französisch'],['es-ES','Spanisch'],['it-IT','Italienisch'],['tr-TR','Türkisch'],['pl-PL','Polnisch'],['ru-RU','Russisch'],['nl-NL','Niederländisch'],['pt-PT','Portugiesisch']];
+  return `<div class="secbody">
+  <div class="field"><label for="s-goal">Punkte pro Päckchen</label><input id="s-goal" class="in" type="number" inputmode="numeric" min="10" max="2000" value="${L.goal}" data-change="set" data-k="goal"></div>
+  <div class="field"><label for="s-ppr">Punkte pro richtiger Antwort</label><input id="s-ppr" class="in" type="number" inputmode="numeric" min="1" max="100" value="${L.ppr}" data-change="set" data-k="ppr"></div>
+  <div class="field"><label for="s-pack">Karten pro Päckchen</label><input id="s-pack" class="in" type="number" inputmode="numeric" min="1" max="9" value="${L.packSize}" data-change="set" data-k="packSize"></div>
+  <div class="field"><label for="s-sess">Wörter pro Lerneinheit</label><input id="s-sess" class="in" type="number" inputmode="numeric" min="3" max="50" value="${L.sessionSize}" data-change="set" data-k="sessionSize"></div>
+  <div class="field"><label for="s-dir">Abfrage beim Schreiben</label><select id="s-dir" class="in" data-change="set" data-k="dir">
+    <option value="mix" ${L.dir==='mix'?'selected':''}>Gemischt</option>
+    <option value="f2d" ${L.dir==='f2d'?'selected':''}>${esc(L.name)} → Deutsch</option>
+    <option value="d2f" ${L.dir==='d2f'?'selected':''}>Deutsch → ${esc(L.name)}</option></select></div>
+  <div class="field"><label for="s-sl">Spracherkennung beim Sprechen (automatisch: ${esc(resolveSpeechLang(L))})</label><select id="s-sl" class="in" data-change="set" data-k="speechLang">${sl.map(([v,t])=>`<option value="${v}" ${L.speechLang===v?'selected':''}>${t}</option>`).join('')}</select></div>
+  <p class="note">Beim Sprechen wird immer das deutsche Wort vorgegeben. Mit den Standardwerten sind 10 richtige Antworten ein Päckchen mit 3 Karten. Seltenheit: Normal 62 %, Selten 26 %, Episch 10 %, Legendär 2 %.</p>
+  <button class="btn block" data-a="gift">1 Päckchen schenken</button></div>`;
+}
+function pBackup(){
+  return `<div class="secbody">
+  ${deferredInstall?`<button class="btn primary block" data-a="install" style="margin-bottom:12px">App auf dem Handy installieren</button>`:''}
+  <button class="btn block" data-a="export">Sicherung speichern</button>
+  <p class="note">Speichert alle Sprachen, Vokabeln, Fortschritt und Karten in einer Datei. Am besten ab und zu machen.</p>
+  <label class="btn block" for="bkin">Sicherung laden</label><input id="bkin" type="file" accept=".json,application/json" hidden data-change="import">
+  ${ui.pendingImport?`<div class="busy">Sicherung gefunden: ${ui.pendingImport.state.langs.length} Sprache(n), ${Object.keys(ui.pendingImport.images||{}).length} Bilder. Alle aktuellen Daten werden ersetzt.<div class="row" style="margin-top:8px"><button class="btn small danger" data-a="import-yes">Ja, ersetzen</button><button class="btn small" data-a="import-no">Abbrechen</button></div></div>`:''}
+  <h3 style="margin-top:18px">PIN ändern</h3>
+  <div class="field"><label for="pn1">Neue PIN (4 bis 8 Ziffern)</label><input id="pn1" class="in" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></div>
+  <button class="btn block" data-a="pin-change">PIN ändern</button></div>`;
+}
+
+function vModal(){
+  const L=curLang(),m=ui.modal;if(!L)return '';
+  const wrap=inner=>`<div class="modal" data-a="backdrop"><div class="mbox">${inner}</div></div>`;
+  if(m.t==='word'){
+    const w=L.vocab.find(x=>x.id===m.id);if(!w)return '';
+    return wrap(`<h3>Wort bearbeiten</h3>
+    <div class="field"><label for="we-f">${esc(L.name)}</label><input id="we-f" class="in" value="${esc(w.f)}" maxlength="80"></div>
+    <div class="field"><label for="we-d">Deutsch</label><input id="we-d" class="in" value="${esc(w.d)}" maxlength="80"></div>
+    <div class="field"><label for="we-u">Kategorie</label><input id="we-u" class="in" list="unitlist2" value="${esc(w.unit)}" maxlength="40"><datalist id="unitlist2">${unitsOf(L).map(u=>`<option value="${esc(u)}">`).join('')}</datalist></div>
+    <div class="row"><button class="btn primary grow" data-a="save-word" data-id="${w.id}">Speichern</button>${confBtn('del-wordm:'+w.id,'Löschen','')}</div>
+    <button class="btn block" style="margin-top:8px" data-a="close-modal">Abbrechen</button>`);
+  }
+  if(m.t==='unit'){
+    return wrap(`<h3>Kategorie umbenennen</h3>
+    <div class="field"><label for="ue-name">Neuer Name</label><input id="ue-name" class="in" value="${esc(m.u)}" maxlength="40"></div>
+    <p class="note">Gibt es den Namen schon, werden beide Kategorien zusammengelegt.</p>
+    <button class="btn primary block" data-a="save-unit" data-u="${esc(m.u)}">Speichern</button>
+    <button class="btn block" style="margin-top:8px" data-a="close-modal">Abbrechen</button>`);
+  }
+  if(m.t==='streak'){
+    const r=S.streakRewards.find(x=>x.id===m.id);if(!r)return '';
+    return wrap(`<h3>Serien-Belohnung bearbeiten</h3>${streakFields('se',r)}
+    <div class="row"><button class="btn primary grow" data-a="save-streak" data-id="${r.id}">Speichern</button>${confBtn('del-streak:'+r.id,'Löschen','')}</div>
+    <button class="btn block" style="margin-top:8px" data-a="close-modal">Abbrechen</button>`);
+  }
+  if(m.t==='prize'){
+    const r=S.rewards.find(x=>x.id===m.id);if(!r)return '';
+    return wrap(`<h3>Belohnung bearbeiten</h3>
+    <div class="field"><label for="pe-text">Text</label><input id="pe-text" class="in" value="${esc(r.text)}" maxlength="80"></div>
+    <div class="field"><label for="pe-rar">Seltenheit</label><select id="pe-rar" class="in">${rarOptions(r.rarity)}</select></div>
+    <div class="field"><label for="pe-scope">Gilt für</label><select id="pe-scope" class="in"><option value="one" ${r.lang!=='all'?'selected':''}>nur ${esc(L.name)}</option><option value="all" ${r.lang==='all'?'selected':''}>alle Sprachen</option></select></div>
+    <label class="chk"><input type="checkbox" id="pe-once" ${r.once?'checked':''}> Nur einmal gewinnbar</label>
+    <div class="row"><button class="btn primary grow" data-a="save-prize" data-id="${r.id}">Speichern</button>${confBtn('del-prize:'+r.id,'Löschen','')}</div>
+    <button class="btn block" style="margin-top:8px" data-a="close-modal">Abbrechen</button>`);
+  }
+  const c=L.cards.find(x=>x.id===m.id);if(!c)return '';
+  if(m.t==='view'){
+    return wrap(`<div style="max-width:260px;margin:0 auto 12px">${cardFace(c,false,L.owned[c.id]||0)}</div>
+    <p class="center"><b>${esc(c.name)}</b><br><span class="muted">${rar(c.rarity).label} · ${L.owned[c.id]||0}× gesammelt</span></p>
+    <button class="btn primary block" data-a="close-modal">Schließen</button>`);
+  }
+  return wrap(`<div style="max-width:200px;margin:0 auto 12px">${cardFace(c,false,0)}</div>
+  <div class="field"><label for="ced-name">Name</label><input id="ced-name" class="in" value="${esc(c.name)}" maxlength="40"></div>
+  <div class="field"><label for="ced-rar">Seltenheit</label><select id="ced-rar" class="in">${rarOptions(c.rarity)}</select></div>
+  <div class="row"><button class="btn primary grow" data-a="save-card" data-id="${c.id}">Speichern</button>${confBtn('del-card:'+c.id,'Löschen','')}</div>
+  <button class="btn block" style="margin-top:8px" data-a="close-modal">Abbrechen</button>`);
+}
+
+let lastView=null;
+function render(){
+  let h='';
+  switch(ui.view){
+    case 'quiz':h=vQuiz();break;
+    case 'summary':h=vSummary();break;
+    case 'pack':h=vPack();break;
+    case 'album':h=vAlbum();break;
+    case 'list':h=vList();break;
+    case 'parent':h=vParent();break;
+    default:h=vHome();
+  }
+  $('#app').innerHTML=h+(ui.modal?vModal():'');
+  document.body.classList.toggle('immersive',ui.view==='quiz'||ui.view==='pack');
+  const tab=ui.view==='album'?'album':ui.view==='parent'?'parent':'home';
+  ['home','album','parent'].forEach(k=>$('#n-'+k).classList.toggle('on',k===tab));
+  if(lastView!==ui.view){window.scrollTo(0,0);lastView=ui.view;}
+  if(ui.view==='quiz'){
+    if(Q.phase==='ask'){const a=$('#ans');if(a)a.focus();}else if(Q.phase==='fb'){const b=$('#nextbtn');if(b)b.focus();}
+  }
+}
+
+/* ================= Lernen ================= */
+function stopListen(){try{if(rec){rec.onend=null;rec.onerror=null;rec.onresult=null;rec.abort();}}catch(e){}rec=null;if(Q)Q.listening=false;}
+function startQuiz(){
+  const L=curLang();if(!L||!L.vocab.length)return;
+  const ids=pickSession(L.vocab,ui.unit,L.sessionSize,Date.now());
+  if(!ids.length){toast('Keine Wörter in dieser Liste');return;}
+  const speak=S.mode==='speak';
+  const dirOf=()=>speak?'d2f':(L.dir==='mix'?(Math.random()<.5?'f2d':'d2f'):L.dir);
+  Q={langId:L.id,mode:speak?'speak':'write',queue:ids.map(id=>({id,dir:dirOf(),first:true,attempts:0})),total:ids.length,phase:'ask',hint:0,earned:0,rightFirst:0,packs:0,fb:null,last:null,listening:false,speechMsg:''};
+  ui.view='quiz';render();
+}
+function resolveAnswer(kind,heard){
+  const L=curLang(),it=Q.queue.shift();Q.last=it;
+  const w=L.vocab.find(x=>x.id===it.id);
+  let pts=0;const hinted=Q.hint>0,retry=!it.first;
+  if(it.first){
+    applyFirstTry(w,kind,hinted,Date.now());
+    if(kind==='right'&&!hinted){pts=L.ppr;Q.rightFirst++;}
+    else if(kind==='right'||kind==='almost'){pts=Math.round(L.ppr/2);}
+    it.first=false;
+  }
+  it.attempts++;
+  let dropped=false;
+  if(kind!=='right'){
+    if(it.attempts<3)Q.queue.splice(Math.min(2,Q.queue.length),0,it);else dropped=true;
+  }
+  if(pts){Q.packs+=addPoints(L,pts);Q.earned+=pts;}
+  save();
+  Q.fb={kind,pts,hinted,retry,dropped,heard:heard||''};Q.phase='fb';Q.speechMsg='';render();
+}
+function nextQuestion(){
+  Q.hint=0;Q.phase='ask';Q.speechMsg='';
+  if(!Q.queue.length){finishQuiz();return;}
+  render();
+}
+function finishQuiz(){
+  const t=dateKey(0),s=S.streak;Q.streakAwards=[];
+  if(s.last!==t){
+    s.count=(s.last===dateKey(-1))?s.count+1:1;s.last=t;
+    const L=curLang();
+    for(const r of matchStreak(s.count,S.streakRewards)){
+      if(r.kind==='pack'){L.packs+=r.packs||1;Q.streakAwards.push({kind:'pack',packs:r.packs||1,days:s.count});}
+      else{L.wins.push({id:uid(),rid:r.id,text:r.text,rarity:'e',src:'streak',days:s.count,ts:Date.now(),redeemed:false});Q.streakAwards.push({kind:'text',text:r.text,days:s.count});}
+    }
+  }
+  save();ui.view='summary';render();
+}
+function startListen(){
+  const SRC=SRClass();if(!SRC||!Q)return;
+  if(Q.listening){try{rec.stop();}catch(e){}return;}
+  const L=curLang();let got=null,err='';
+  rec=new SRC();rec.lang=resolveSpeechLang(L);rec.interimResults=false;rec.maxAlternatives=5;rec.continuous=false;
+  rec.onresult=e=>{got=[...e.results[0]].map(a=>a.transcript);};
+  rec.onerror=e=>{err=e.error||'';};
+  rec.onend=()=>{
+    Q.listening=false;rec=null;
+    if(got&&got.length){
+      const it=Q.queue[0],w=L.vocab.find(x=>x.id===it.id);
+      resolveAnswer(evalSpeech(got,it.dir==='f2d'?w.d:w.f),got[0]);return;
+    }
+    Q.speechMsg=(err==='not-allowed'||err==='service-not-allowed')?'Das Mikrofon ist nicht erlaubt. Erlaube es in den Chrome-Einstellungen für diese Seite.'
+      :err==='network'?'Dafür brauchst du Internet.':'Ich habe nichts gehört. Versuch es nochmal.';
+    render();
+  };
+  try{rec.start();Q.listening=true;Q.speechMsg='';render();}catch(e){Q.speechMsg='Das hat nicht geklappt. Versuch es nochmal.';render();}
+}
+
+/* ================= Päckchen ================= */
+function openPack(){
+  const L=curLang();if(!L||L.packs<1)return;
+  const pool=L.cards.concat(rewardsFor(L));
+  if(!pool.length){toast('Noch keine Karten im Album. Bitte Mama oder Papa fragen.');return;}
+  const drawn=drawCards(pool,L.packSize);
+  L.packs--;
+  const items=drawn.map(c=>{
+    if(c.kind==='reward'){
+      L.wins.push({id:uid(),rid:c.id,text:c.text,rarity:c.rarity,ts:Date.now(),redeemed:false});
+      if(c.once)c.active=false;
+      return {card:c,isNew:true,on:false};
+    }
+    const isNew=!(L.owned[c.id]>0);L.owned[c.id]=(L.owned[c.id]||0)+1;return {card:c,isNew,on:false};
+  });
+  save();ui.pack={items,opened:false};ui.view='pack';render();
+}
+
+/* ================= Sicherung ================= */
+const blobToDataURL=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(b);});
+async function exportBackup(){
+  try{
+    const images={};for(const id of Object.keys(BLOBS))images[id]=await blobToDataURL(BLOBS[id]);
+    const blob=new Blob([JSON.stringify({app:'woerter-sammler',v:1,state:S,images})],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='woerter-sammler-sicherung-'+dateKey(0)+'.json';
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    toast('Sicherung gespeichert');
+  }catch(e){toast('Sicherung fehlgeschlagen');}
+}
+async function applyImport(){
+  const d=ui.pendingImport;ui.pendingImport=null;if(!d)return;
+  try{
+    try{await idbClear();}catch(e){}
+    Object.keys(IMG).forEach(k=>{URL.revokeObjectURL(IMG[k]);delete IMG[k];delete BLOBS[k];});
+    for(const id of Object.keys(d.images||{})){const b=await (await fetch(d.images[id])).blob();await putImg(id,b);}
+    S=migrate(d.state);save();ui.unlocked=true;toast('Sicherung geladen');
+  }catch(e){toast('Laden fehlgeschlagen');}
+  render();
+}
+
+/* ================= Ereignisse ================= */
+function ask(key){
+  if(ui.confirm!==key){ui.confirm=key;clearTimeout(confirmT);confirmT=setTimeout(()=>{ui.confirm=null;render();},4000);render();return false;}
+  ui.confirm=null;clearTimeout(confirmT);return true;
+}
+async function importFiles(files){
+  const L=curLang();if(!L||!files.length)return;
+  let n=0;
+  for(const f of files){
+    setBusy(`Importiere ${n+1} von ${files.length} …`);
+    try{const blob=await fileToBlob(f);const id=uid();await putImg(id,blob);L.cards.push({id,name:cleanCardName(f.name),rarity:ui.imprar});n++;}catch(e){}
+  }
+  save();setBusy('');toast(n+' Karten hinzugefügt');render();
+}
+function setBusy(t){ui.busy=t;const b=$('#busy');if(b){b.textContent=t;b.hidden=!t;}}
+async function addStarter(){
+  const L=curLang();if(!L)return;
+  setBusy('Karten werden erstellt …');
+  for(const [emoji,name,r,color] of STARTER){const id=uid();await putImg(id,await starterBlob(emoji,color));L.cards.push({id,name,rarity:r});}
+  save();setBusy('');toast('12 Platzhalter-Karten hinzugefügt');render();
+}
+function clamp(v,a,b){v=Math.round(Number(v));if(!isFinite(v))v=a;return Math.min(b,Math.max(a,v));}
+const val=sel=>{const e=$(sel);return e?e.value:'';};
+
+document.addEventListener('click',async e=>{
+  const el=e.target.closest('[data-a]');if(!el)return;
+  const d=el.dataset,L=curLang();
+  switch(d.a){
+    case 'nav':if(Q&&Q.listening)stopListen();if(ui.view==='parent'&&d.v!=='parent')ui.unlocked=false;ui.view=d.v;ui.modal=null;ui.pinErr='';render();break;
+    case 'lang':S.activeLang=d.id;ui.unit='';ui.lf='';save();render();break;
+    case 'unit':ui.unit=d.u;render();break;
+    case 'mode':S.mode=d.m==='speak'?'speak':'write';save();render();break;
+    case 'start':startQuiz();break;
+    case 'quit':stopListen();ui.view='home';render();break;
+    case 'show-list':ui.view='list';render();break;
+    case 'list-sort':ui.ls=ui.ls.col===d.c?{col:d.c,dir:-ui.ls.dir}:{col:d.c,dir:1};render();break;
+    case 'list-filter':ui.lf=d.u;render();break;
+    case 'check':{
+      const v=val('#ans');
+      if(!v.trim()){toast('Schreibe zuerst eine Antwort.');break;}
+      const it=Q.queue[0],w=L.vocab.find(x=>x.id===it.id);
+      resolveAnswer(checkAnswer(v,it.dir==='f2d'?w.d:w.f));break;}
+    case 'skip':stopListen();resolveAnswer('wrong');break;
+    case 'listen':startListen();break;
+    case 'show-answer':Q.phase='reveal';render();break;
+    case 'self-yes':resolveAnswer('right');break;
+    case 'self-no':resolveAnswer('wrong');break;
+    case 'hint':{
+      const it=Q.queue[0],w=L.vocab.find(x=>x.id===it.id);
+      const letters=[...primaryAnswer(it.dir==='f2d'?w.d:w.f)].filter(c=>c!==' ').length;
+      if(Q.hint<letters-1)Q.hint++;
+      const v=val('#ans');render();const a=$('#ans');if(a){a.value=v;a.focus();}break;}
+    case 'next':nextQuestion();break;
+    case 'open-pack':openPack();break;
+    case 'tear':ui.pack.opened=true;if(navigator.vibrate)navigator.vibrate(30);render();break;
+    case 'flip':{
+      const it=ui.pack.items[+d.i];if(it.on)break;
+      it.on=true;el.classList.add('on');
+      if(it.card.kind==='reward'||it.card.rarity==='e'||it.card.rarity==='l'){if(navigator.vibrate)navigator.vibrate(40);}
+      $('#packact').innerHTML=packActions();
+      if(ui.pack.items.every(i=>i.on))$('#packhint').textContent='Das sind deine neuen Karten!';
+      break;}
+    case 'flip-all':{
+      ui.pack.items.forEach(i=>i.on=true);
+      document.querySelectorAll('.flip').forEach(f=>f.classList.add('on'));
+      $('#packact').innerHTML=packActions();$('#packhint').textContent='Das sind deine neuen Karten!';break;}
+    case 'view-card':ui.modal={t:'view',id:d.id};render();break;
+    case 'edit-card':ui.modal={t:'edit',id:d.id};render();break;
+    case 'close-modal':ui.modal=null;ui.confirm=null;render();break;
+    case 'backdrop':if(e.target===el){ui.modal=null;ui.confirm=null;render();}break;
+    case 'save-card':{
+      const c=L.cards.find(x=>x.id===d.id);if(!c)break;
+      c.name=val('#ced-name').trim()||c.name;c.rarity=val('#ced-rar');
+      save();ui.modal=null;render();break;}
+    case 'del-card':{
+      if(!ask(d.key))break;
+      const id=d.key.split(':')[1];L.cards=L.cards.filter(c=>c.id!==id);delete L.owned[id];await delImg(id);
+      save();ui.modal=null;render();break;}
+    case 'pin-set':{
+      const a=val('#pin1'),b=val('#pin2');
+      if(!/^\d{4,8}$/.test(a)){ui.pinErr='Die PIN braucht 4 bis 8 Ziffern.';render();break;}
+      if(a!==b){ui.pinErr='Die beiden PINs sind verschieden.';render();break;}
+      S.pinHash=hashPin(a);save();ui.unlocked=true;ui.pinErr='';render();break;}
+    case 'pin-go':{
+      if(hashPin(val('#pin'))===S.pinHash){ui.unlocked=true;ui.pinErr='';}else ui.pinErr='Falsche PIN.';
+      render();break;}
+    case 'pin-change':{
+      const a=val('#pn1');
+      if(!/^\d{4,8}$/.test(a)){toast('Die PIN braucht 4 bis 8 Ziffern.');break;}
+      S.pinHash=hashPin(a);save();$('#pn1').value='';toast('PIN geändert');break;}
+    case 'lock':ui.unlocked=false;render();break;
+    case 'sec':ui.sec=ui.sec===d.k?'':d.k;render();break;
+    case 'add-lang':{
+      const n=val('#newlang').trim();if(!n){toast('Bitte einen Namen eingeben.');break;}
+      const nl=newLang(n);S.langs.push(nl);S.activeLang=nl.id;save();render();toast(n+' angelegt');break;}
+    case 'del-lang':{
+      if(!ask(d.key))break;
+      const id=d.key.split(':')[1],l=S.langs.find(x=>x.id===id);
+      if(l)for(const c of l.cards)await delImg(c.id);
+      S.langs=S.langs.filter(x=>x.id!==id);S.rewards=S.rewards.filter(r=>r.lang!==id);
+      if(S.activeLang===id)S.activeLang=S.langs[0]?S.langs[0].id:null;
+      save();render();break;}
+    case 'add-vocab':{
+      if(!L)break;
+      const {items,skipped}=parseVocab(ui.vtext);
+      if(!items.length){toast('Keine Zeile mit „=“ gefunden.');break;}
+      const unit=(ui.vunit||'').trim()||'Allgemein';let n=0,dup=0;
+      for(const it of items){
+        if(L.vocab.some(w=>w.unit===unit&&w.f.toLowerCase()===it.f.toLowerCase()&&w.d.toLowerCase()===it.d.toLowerCase())){dup++;continue;}
+        L.vocab.push({id:uid(),f:it.f,d:it.d,unit,box:1,due:0,seen:0,right:0,wrong:0});n++;
+      }
+      ui.vtext='';save();render();
+      toast(n+' hinzugefügt'+(dup?`, ${dup} doppelt`:'')+(skipped?`, ${skipped} Zeile(n) übersprungen`:''));break;}
+    case 'toggle-cats':ui.cats=!ui.cats;render();break;
+    case 'open-unit':ui.openUnit=ui.openUnit===d.u?'':d.u;render();break;
+    case 'rename-unit':ui.modal={t:'unit',u:d.u};render();break;
+    case 'save-unit':{
+      const nn=val('#ue-name').trim();if(!nn){toast('Der Name darf nicht leer sein.');break;}
+      L.vocab.forEach(w=>{if(w.unit===d.u)w.unit=nn;});
+      if(ui.openUnit===d.u)ui.openUnit=nn;ui.unit='';ui.lf='';ui.modal=null;save();render();toast('Umbenannt');break;}
+    case 'del-unit':{
+      if(!ask(d.key))break;
+      const u=d.key.slice('del-unit:'.length);L.vocab=L.vocab.filter(w=>w.unit!==u);if(ui.openUnit===u)ui.openUnit='';save();render();break;}
+    case 'edit-word':ui.modal={t:'word',id:d.id};render();break;
+    case 'save-word':{
+      const w=L.vocab.find(x=>x.id===d.id);if(!w)break;
+      const f=val('#we-f').trim(),dd=val('#we-d').trim(),u=val('#we-u').trim();
+      if(!f||!dd){toast('Beide Wörter müssen ausgefüllt sein.');break;}
+      w.f=f;w.d=dd;w.unit=u||'Allgemein';save();ui.modal=null;render();toast('Gespeichert');break;}
+    case 'del-wordm':{
+      if(!ask(d.key))break;
+      const id=d.key.split(':')[1];L.vocab=L.vocab.filter(w=>w.id!==id);save();ui.modal=null;render();break;}
+    case 'del-word':L.vocab=L.vocab.filter(w=>w.id!==d.id);save();render();break;
+    case 'reset-learn':{
+      if(!ask(d.key))break;
+      L.vocab.forEach(w=>{w.box=1;w.due=0;w.seen=0;w.right=0;w.wrong=0;});save();render();toast('Lernstand zurückgesetzt');break;}
+    case 'add-prize':{
+      const text=val('#pz-text').trim();if(!text){toast('Bitte einen Text eingeben.');break;}
+      S.rewards.push({id:uid(),kind:'reward',text,rarity:val('#pz-rar')||'s',lang:val('#pz-scope')==='all'?'all':L.id,active:true,once:!!($('#pz-once')&&$('#pz-once').checked)});
+      save();render();toast('Belohnung hinterlegt');break;}
+    case 'toggle-prize':{
+      const r=S.rewards.find(x=>x.id===d.id);if(r){r.active=!r.active;save();render();}break;}
+    case 'edit-prize':ui.modal={t:'prize',id:d.id};render();break;
+    case 'save-prize':{
+      const r=S.rewards.find(x=>x.id===d.id);if(!r)break;
+      const text=val('#pe-text').trim();if(!text){toast('Der Text darf nicht leer sein.');break;}
+      r.text=text;r.rarity=val('#pe-rar')||r.rarity;r.lang=val('#pe-scope')==='all'?'all':L.id;r.once=!!($('#pe-once')&&$('#pe-once').checked);
+      save();ui.modal=null;render();break;}
+    case 'del-prize':{
+      if(!ask(d.key))break;
+      const id=d.key.split(':')[1];S.rewards=S.rewards.filter(r=>r.id!==id);save();ui.modal=null;render();break;}
+    case 'redeem':{
+      const w=L.wins.find(x=>x.id===d.id);if(w){w.redeemed=true;w.redeemedTs=Date.now();save();render();}break;}
+    case 'add-streak':{
+      const r=readStreak('sr');
+      if(r.kind==='text'&&!r.text){toast('Bitte einen Text eingeben.');break;}
+      S.streakRewards.push({id:uid(),active:true,...r});save();render();toast('Serien-Belohnung hinterlegt');break;}
+    case 'toggle-streak':{const r=S.streakRewards.find(x=>x.id===d.id);if(r){r.active=r.active===false;save();render();}break;}
+    case 'edit-streak':ui.modal={t:'streak',id:d.id};render();break;
+    case 'save-streak':{
+      const r=S.streakRewards.find(x=>x.id===d.id);if(!r)break;
+      const n=readStreak('se');if(n.kind==='text'&&!n.text){toast('Bitte einen Text eingeben.');break;}
+      Object.assign(r,n);save();ui.modal=null;render();break;}
+    case 'del-streak':{
+      if(!ask(d.key))break;
+      const id=d.key.split(':')[1];S.streakRewards=S.streakRewards.filter(r=>r.id!==id);save();ui.modal=null;render();break;}
+    case 'del-packimg':{if(!ask(d.key))break;await delImg(PACK_KEY);render();toast('Standard-Päckchen wird gezeigt');break;}
+    case 'starter':addStarter();break;
+    case 'gift':if(L){L.packs++;save();toast('1 Päckchen geschenkt');}break;
+    case 'export':exportBackup();break;
+    case 'import-yes':applyImport();break;
+    case 'import-no':ui.pendingImport=null;render();break;
+    case 'install':if(deferredInstall){deferredInstall.prompt();deferredInstall=null;render();}break;
+  }
+});
+document.addEventListener('change',async e=>{
+  const el=e.target,k=el.dataset&&el.dataset.change;if(!k)return;
+  const L=curLang();
+  if(k==='imprar')ui.imprar=el.value;
+  else if(k==='srkind'){const p=el.dataset.p;const a=$('#'+p+'-packs-w'),b=$('#'+p+'-text-w');if(a)a.hidden=el.value!=='pack';if(b)b.hidden=el.value!=='text';}
+  else if(k==='packimg'){
+    const f=el.files[0];el.value='';if(!f)return;
+    try{const b=await packImageBlob(f);await putImg(PACK_KEY,b);toast('Päckchen-Bild gespeichert');}catch(err){toast('Das Bild konnte nicht gelesen werden.');}
+    render();
+  }
+  else if(k==='files'){const files=[...el.files];el.value='';await importFiles(files);}
+  else if(k==='set'&&L){
+    const key=el.dataset.k;
+    if(key==='goal')L.goal=clamp(el.value,10,2000);
+    else if(key==='ppr')L.ppr=clamp(el.value,1,100);
+    else if(key==='packSize')L.packSize=clamp(el.value,1,9);
+    else if(key==='sessionSize')L.sessionSize=clamp(el.value,3,50);
+    else if(key==='dir')L.dir=el.value;
+    else if(key==='speechLang')L.speechLang=el.value;
+    while(L.points>=L.goal){L.points-=L.goal;L.packs++;}
+    save();render();toast('Gespeichert');
+  }else if(k==='import'){
+    const f=el.files[0];el.value='';if(!f)return;
+    try{
+      const d=JSON.parse(await f.text());
+      if(d.app!=='woerter-sammler'||!d.state||!Array.isArray(d.state.langs))throw new Error('x');
+      ui.pendingImport=d;render();
+    }catch(err){toast('Das ist keine gültige Sicherung.');}
+  }
+});
+document.addEventListener('input',e=>{
+  const k=e.target.dataset&&e.target.dataset.input;
+  if(k==='vtext')ui.vtext=e.target.value;else if(k==='vunit')ui.vunit=e.target.value;
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  if(ui.view==='quiz'&&Q){
+    if(Q.phase==='ask'&&Q.mode==='write'){e.preventDefault();const b=document.querySelector('[data-a="check"]');if(b)b.click();}
+    else if(Q.phase==='fb'){e.preventDefault();nextQuestion();}
+  }
+  else if(ui.view==='parent'&&!ui.unlocked){const b=document.querySelector('[data-a="pin-go"],[data-a="pin-set"]');if(b)b.click();}
+});
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;});
+
+/* ================= Start ================= */
+(async function init(){
+  try{db=await idbOpen();const all=await idbAll();for(const id of Object.keys(all)){BLOBS[id]=all[id];IMG[id]=URL.createObjectURL(all[id]);}}catch(e){db=null;}
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
+  save();render();
+  if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>
