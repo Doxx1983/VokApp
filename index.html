@@ -650,8 +650,8 @@ function vHome(){
   </div>
   <div class="seg seg3" role="group" aria-label="Wörter pro Lerneinheit">${[10,20,30].map(k=>`<button class="${L.sessionSize===k?'on':''}" data-a="size" data-n="${k}">${k} Wörter</button>`).join('')}</div>
   ${S.mode==='speak'&&!SRClass()?`<p class="note">Auf diesem Gerät gibt es keine Spracherkennung. Du sagst das Wort laut und bewertest dich danach selbst.</p>`:''}
-  <div style="height:96px"></div>
-  <div class="startbar"><button class="btn primary block ${st>0?'streakon':''}" style="font-size:20px;min-height:64px" data-a="start">Lernen starten · ${n} Wörter</button></div>`
+  <div style="height:128px"></div>
+  <div class="startbar"><button class="btn primary block ${st>0?'streakon':''}" style="font-size:22px;min-height:96px" data-a="start">Lernen starten · ${n} Wörter</button></div>`
   :`<div class="panel center"><h3>Noch keine Vokabeln</h3><p class="muted">Mama oder Papa tragen sie im Elternbereich ein.</p><button class="btn primary" data-a="nav" data-v="parent">Zum Elternbereich</button></div>`}`;
 }
 
@@ -979,10 +979,12 @@ function vModal(){
 
 let lastView=null;
 const THEME_PROPS=['--streak','--accent-text','--bg','--surface','--surface-2','--ink','--muted','--line','--accent','--accent-2','--accent-dark','--accent-ink','--accent-soft','--good','--good-bg','--bad','--bad-bg','--warn','--warn-bg','--shadow','color-scheme'];
+const STREAK_OVR={gelb:'#ff7a00',hellgelb:'#ff7a00',hellorange:'#ffcc00'};
 function applyTheme(){
   const st=document.documentElement.style,v=themeVars(S.theme);
   THEME_PROPS.forEach(p=>st.removeProperty(p));
   if(v)Object.keys(v).forEach(p=>st.setProperty(p,v[p]));
+  if(STREAK_OVR[S.theme])st.setProperty('--streak',STREAK_OVR[S.theme]);
   const m=document.querySelector('meta[name="theme-color"]'),t=THEMES.find(x=>x.k===S.theme);
   if(m&&t)m.setAttribute('content',t.hex);
 }
