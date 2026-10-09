@@ -144,9 +144,9 @@ textarea.in{resize:vertical;min-height:120px}
 @keyframes glow{0%{box-shadow:0 0 0 0 var(--r-l)}40%{box-shadow:0 0 28px 8px var(--r-l)}100%{box-shadow:0 0 0 0 transparent}}
 /* Navigation */
 nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);z-index:5}
-nav div{max-width:560px;margin:0 auto;display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
-nav button{flex:1;appearance:none;border:0;background:none;color:var(--muted);font:inherit;font-size:12px;font-weight:800;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:12px;cursor:pointer;min-height:54px}
-nav button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+nav div{max-width:560px;margin:0 auto;display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+nav button{flex:1;min-width:0;appearance:none;border:0;background:none;color:var(--muted);font:inherit;font-size:11px;font-weight:800;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:12px;cursor:pointer;min-height:54px}
+nav button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 .themesel{appearance:none;width:100%;border:2px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:10px 14px;font:inherit;font-weight:800;font-size:17px;min-height:54px;display:flex;align-items:center;gap:12px;cursor:pointer;text-align:left}
 .themelist{margin-top:8px;border:2px solid var(--line);border-radius:14px;overflow:hidden;max-height:50vh;overflow-y:auto}
@@ -158,6 +158,11 @@ nav button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width
 .bk{appearance:none;flex:0 0 62%;scroll-snap-align:center;border:3px solid var(--line);background:var(--surface);color:var(--ink);border-radius:18px;padding:8px;font:inherit;font-weight:800;font-size:15px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px}
 .bk img{width:100%;aspect-ratio:360/504;object-fit:cover;border-radius:12px;display:block}
 .bk.on{border-color:var(--accent);background:var(--accent-soft)}
+.chart{width:100%;height:auto;display:block}
+.stack{display:flex;height:18px;border-radius:99px;overflow:hidden;background:var(--line);margin:8px 0}
+.stack i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;font-weight:700}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
 .cb{width:24px;height:24px;border:2px solid var(--line);border-radius:7px;flex:none;display:inline-grid;place-items:center;font-size:15px;font-weight:900;color:var(--accent-ink)}
 .cb.on{background:var(--accent);border-color:var(--accent)}
 .catdrop{margin:10px 0}
@@ -187,7 +192,9 @@ nav button.on{color:var(--accent-text,var(--accent));background:var(--accent-sof
 <div id="app"></div>
 <nav><div>
   <button data-a="nav" data-v="home" id="n-home"><svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/></svg>Lernen</button>
+  <button data-a="nav" data-v="list" id="n-list"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>Vokabeln</button>
   <button data-a="nav" data-v="album" id="n-album"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="12" height="16" rx="2"/><path d="M9 21h10a1 1 0 0 0 1-1V8"/></svg>Album</button>
+  <button data-a="nav" data-v="stats" id="n-stats"><svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V5M19 20v-7"/></svg>Statistik</button>
   <button data-a="nav" data-v="options" id="n-options"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.7 0 2-1.2 1.4-2.2-.7-1.2.1-2.3 1.4-2.3H17a4 4 0 0 0 4-4c0-5-4-9.5-9-9.5z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg>Optionen</button>
   <button data-a="nav" data-v="parent" id="n-parent"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Eltern</button>
 </div></nav>
@@ -448,6 +455,7 @@ function migrate(s){
   s.mode=s.mode==='speak'?'speak':'write';
   s.rewards=Array.isArray(s.rewards)?s.rewards:[];
   s.cardBack=Math.min(Math.max(Math.round(+s.cardBack)||1,1),BACKS.length);
+  s.streak=s.streak||{last:null,count:0};s.streak.best=Math.max(s.streak.best||0,s.streak.count||0);
   s.theme=THEME_DEFS.some(t=>t.k===s.theme)?s.theme:'blau';
   delete s.streakRewards;
   const c=s.streakCfg=s.streakCfg||{};c.days=Math.max(1,Math.min(365,+c.days||5));
@@ -455,7 +463,7 @@ function migrate(s){
   c.nextRid=c.nextRid||'';
   s.streak=s.streak||{last:null,count:0};
   s.langs.forEach(l=>{
-    l.wins=l.wins||[];l.owned=l.owned||{};l.cards=l.cards||[];l.vocab=l.vocab||[];
+    l.log=l.log&&typeof l.log==='object'?l.log:{};l.wins=l.wins||[];l.owned=l.owned||{};l.cards=l.cards||[];l.vocab=l.vocab||[];
     l.speechLang=(!l.speechLang||l.speechLang==='auto'||l.speechLang===speechLangFor(l.name))?'auto':l.speechLang;
     l.goal=l.goal||100;l.ppr=l.ppr||10;l.packSize=l.packSize||3;l.sessionSize=l.sessionSize||10;l.dir=l.dir||'mix';
     l.points=l.points||0;l.packs=l.packs||0;l.totalPoints=l.totalPoints||0;
@@ -463,6 +471,35 @@ function migrate(s){
   if(!s.langs.find(l=>l.id===s.activeLang)) s.activeLang=s.langs[0]?s.langs[0].id:null;
   return s;
 }
+/* Lernprotokoll pro Tag: p Punkte, s Sekunden, a beantwortete Wörter, r davon beim ersten Versuch richtig */
+const WD=['Mo','Di','Mi','Do','Fr','Sa','So'];
+const MONTHS=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const dKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function logAdd(L,d,add){L.log=L.log||{};const k=dKey(d),e=L.log[k]||(L.log[k]={p:0,s:0,a:0,r:0});for(const f in add)e[f]=(e[f]||0)+add[f];}
+function logSum(log,from,to){
+  const t={p:0,s:0,a:0,r:0,days:0};
+  for(let d=new Date(from);d<=to;d.setDate(d.getDate()+1)){
+    const e=log[dKey(d)];if(!e)continue;
+    t.p+=e.p||0;t.s+=e.s||0;t.a+=e.a||0;t.r+=e.r||0;if((e.s||0)>0||(e.a||0)>0)t.days++;
+  }
+  return t;
+}
+function weekRange(now){const a=new Date(now.getFullYear(),now.getMonth(),now.getDate());a.setDate(a.getDate()-(a.getDay()+6)%7);const b=new Date(a);b.setDate(b.getDate()+6);return [a,b];}
+function monthRange(now){return [new Date(now.getFullYear(),now.getMonth(),1),new Date(now.getFullYear(),now.getMonth()+1,0)];}
+function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y0)/864e5+1)/7);}
+function seriesDays(log,now,n){
+  const out=[];
+  for(let i=n-1;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-i),e=log[dKey(d)]||{};
+    out.push({lab:WD[(d.getDay()+6)%7],sub:d.getDate()+'.',p:e.p||0,s:e.s||0,cur:i===0});}
+  return out;
+}
+function seriesWeeks(log,now,n){
+  const w0=weekRange(now)[0],out=[];
+  for(let i=n-1;i>=0;i--){const a=new Date(w0.getFullYear(),w0.getMonth(),w0.getDate()-7*i),b=new Date(a.getFullYear(),a.getMonth(),a.getDate()+6),t=logSum(log,a,b);
+    out.push({lab:'KW'+isoWeek(a),sub:a.getDate()+'.'+(a.getMonth()+1)+'.',p:t.p,s:t.s,cur:i===0});}
+  return out;
+}
+function fmtDur(s){s=Math.round(s||0);if(s<60)return s+' Sek.';const m=Math.round(s/60);if(m<60)return m+' Min.';return Math.floor(m/60)+':'+String(m%60).padStart(2,'0')+' Std.';}
 //LOGIC-END
 
 /* ================= Hilfen ================= */
@@ -485,7 +522,7 @@ const ICON_MIC='<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11"
 /* ================= Daten ================= */
 const KEY='woerter-sammler-v1';
 function newLang(name){
-  return {id:uid(),name,dir:'mix',sessionSize:10,goal:100,packSize:3,ppr:10,speechLang:'auto',points:0,totalPoints:0,packs:0,vocab:[],cards:[],owned:{},wins:[]};
+  return {id:uid(),name,dir:'mix',sessionSize:10,goal:100,packSize:3,ppr:10,speechLang:'auto',points:0,totalPoints:0,packs:0,vocab:[],cards:[],owned:{},wins:[],log:{}};
 }
 function seed(){
   const L=newLang('Englisch');
@@ -561,7 +598,7 @@ function starterBlob(emoji,color){
 }
 
 /* ================= Zustand der Oberfläche ================= */
-const ui={view:'home',unit:[],catOpen:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
+const ui={view:'home',sm:'p',sg:'d',unit:[],catOpen:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
 let Q=null,deferredInstall=null,confirmT,rec=null;
 
 /* ================= Ansichten ================= */
@@ -581,7 +618,6 @@ function vHome(){
   const L=curLang();
   if(!L) return `<div class="panel center"><h2>Willkommen!</h2><p class="muted">Lege im Elternbereich eine Sprache an.</p><button class="btn primary" data-a="nav" data-v="parent">Zum Elternbereich</button></div>`;
   const now=Date.now(),total=L.vocab.length;
-  const dueN=L.vocab.filter(w=>w.due<=now).length,known=L.vocab.filter(w=>w.box>=4).length;
   const units=unitsOf(L);ui.unit=ui.unit.filter(u=>units.includes(u));
   const pool=ui.unit.length?L.vocab.filter(w=>ui.unit.includes(w.unit)).length:total;
   const n=Math.min(L.sessionSize,pool);
@@ -607,23 +643,72 @@ function vHome(){
   </div>
   ${S.mode==='speak'&&!SRClass()?`<p class="note">Auf diesem Gerät gibt es keine Spracherkennung. Du sagst das Wort laut und bewertest dich danach selbst.</p>`:''}
   <button class="btn primary block" style="font-size:20px;min-height:64px" data-a="start">Lernen starten · ${n} Wörter</button>
-  <button class="btn block" style="margin-top:10px" data-a="show-list">Vokabelliste ansehen</button>
-  <div class="stats">
-    <div class="stat"><b>${total}</b><span>Wörter</span></div>
-    <div class="stat"><b>${known}</b><span>sicher gelernt</span></div>
-    <div class="stat"><b>${dueN}</b><span>heute dran</span></div>
-  </div>
   ${st>0?`<p class="center"><span class="pill gold">Serie: ${st} ${st===1?'Tag':'Tage'}</span>${nextT?`<br><span class="note">Nächste Serien-Belohnung nach ${nextT} Tagen</span>`:''}</p>`:''}`
   :`<div class="panel center"><h3>Noch keine Vokabeln</h3><p class="muted">Mama oder Papa tragen sie im Elternbereich ein.</p><button class="btn primary" data-a="nav" data-v="parent">Zum Elternbereich</button></div>`}`;
 }
 
+function barChart(ser,metric){
+  const n=ser.length,W=340,H=176,top=22,bot=40,ch=H-top-bot;
+  const val=x=>metric==='p'?x.p:x.s/60;
+  const mx=Math.max(1,...ser.map(val)),bw=W/n,w=Math.min(bw*.62,34);
+  const lbl=x=>{const v=val(x);if(metric==='p')return v>0?String(v):'';return x.s<=0?'':(v<1?'<1':String(Math.round(v)));};
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Verlauf">
+  <line x1="0" x2="${W}" y1="${top+ch}" y2="${top+ch}" stroke="var(--line)" stroke-width="2"/>
+  ${ser.map((x,i)=>{const v=val(x),bh=v>0?Math.max(4,v/mx*ch):0,cx=bw*i+bw/2,y=top+ch-bh;
+    return `${bh?`<rect x="${(cx-w/2).toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${bh.toFixed(1)}" rx="5" fill="var(--accent)" opacity="${x.cur?1:.55}"/>`:''}
+    <text x="${cx.toFixed(1)}" y="${(y-5).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="800" fill="var(--ink)">${lbl(x)}</text>
+    <text x="${cx.toFixed(1)}" y="${top+ch+16}" text-anchor="middle" font-size="${n>10?9.5:11}" font-weight="800" fill="${x.cur?'var(--ink)':'var(--muted)'}">${x.lab}</text>
+    <text x="${cx.toFixed(1)}" y="${top+ch+30}" text-anchor="middle" font-size="${n>10?8.5:10}" fill="var(--muted)">${x.sub}</text>`;}).join('')}
+  </svg>`;
+}
+function periodPanel(title,t){
+  return `<div class="panel"><h3>${title}</h3><div class="stats" style="margin:8px 0 0">
+  <div class="stat"><b>${t.p}</b><span>Punkte</span></div>
+  <div class="stat"><b style="font-size:19px">${fmtDur(t.s)}</b><span>Lernzeit</span></div>
+  <div class="stat"><b>${t.days}</b><span>Lerntage</span></div></div></div>`;
+}
+function vStats(){
+  const L=curLang();
+  if(!L) return `<div class="panel center"><p>Noch keine Sprache angelegt.</p></div>`;
+  const now=new Date(),nowMs=Date.now(),log=L.log||(L.log={});
+  const total=L.vocab.length,dueN=L.vocab.filter(w=>w.due<=nowMs).length,known=L.vocab.filter(w=>w.box>=4&&w.seen>0).length,fresh=L.vocab.filter(w=>!(w.seen>0)).length,learn=total-known-fresh;
+  const rt=L.vocab.reduce((a,w)=>a+(w.right||0),0),wr=L.vocab.reduce((a,w)=>a+(w.wrong||0),0);
+  const quote=rt+wr?Math.round(rt/(rt+wr)*100)+' %':'–';
+  const have=L.cards.filter(c=>L.owned[c.id]>0).length;
+  const [w0,w1]=weekRange(now),[m0,m1]=monthRange(now);
+  const wk=logSum(log,w0,w1),mo=logSum(log,m0,m1);
+  const ser=ui.sg==='w'?seriesWeeks(log,now,12):seriesDays(log,now,14);
+  const pc=n=>total?Math.round(n/total*100):0;
+  const hard=L.vocab.filter(w=>(w.wrong||0)>0).sort((a,b)=>(b.wrong||0)-(a.wrong||0)).slice(0,5);
+  const stt=streakNow(),best=Math.max(S.streak.best||0,stt);
+  return `${langChips()}<h2>Statistik</h2>
+  <div class="stats">
+    <div class="stat"><b>${total}</b><span>Wörter</span></div>
+    <div class="stat"><b>${known}</b><span>sicher gelernt</span></div>
+    <div class="stat"><b>${dueN}</b><span>heute dran</span></div>
+    <div class="stat"><b>${quote}</b><span>richtig</span></div>
+    <div class="stat"><b>${have}/${L.cards.length}</b><span>Karten</span></div>
+    <div class="stat"><b>${stt}</b><span>Serie (Rekord ${best})</span></div>
+  </div>
+  ${periodPanel('Diese Woche <span class="muted sm">Mo–So</span>',wk)}
+  ${periodPanel('Dieser Monat <span class="muted sm">'+MONTHS[now.getMonth()]+'</span>',mo)}
+  <div class="panel"><h3>Verlauf</h3>
+    <div class="seg" role="group" aria-label="Kennzahl" style="margin:8px 0"><button class="${ui.sm==='p'?'on':''}" data-a="sm" data-v="p">Punkte</button><button class="${ui.sm==='s'?'on':''}" data-a="sm" data-v="s">Lernzeit (Min.)</button></div>
+    <div class="seg" role="group" aria-label="Zeitraum" style="margin:8px 0"><button class="${ui.sg==='d'?'on':''}" data-a="sg" data-v="d">Tage</button><button class="${ui.sg==='w'?'on':''}" data-a="sg" data-v="w">Wochen</button></div>
+    ${barChart(ser,ui.sm)}
+    <p class="note center">${ui.sg==='w'?'Letzte 12 Wochen':'Letzte 14 Tage'} · aktueller ${ui.sg==='w'?'Woche':'Tag'} kräftig</p></div>
+  <div class="panel"><h3>Wissensstand</h3>
+    <div class="stack" role="img" aria-label="Neu ${fresh}, Lerne ich ${learn}, Sicher ${known}"><i style="width:${pc(known)}%;background:var(--good)"></i><i style="width:${pc(learn)}%;background:var(--accent)"></i><i style="width:${pc(fresh)}%;background:var(--line)"></i></div>
+    <div class="legend"><span><i style="background:var(--good)"></i>Sicher ${known}</span><span><i style="background:var(--accent)"></i>Lerne ich ${learn}</span><span><i style="background:var(--line)"></i>Neu ${fresh}</span></div></div>
+  ${hard.length?`<div class="panel"><h3>Knifflige Wörter</h3>${hard.map(w=>`<div class="urow"><div class="t"><b>${esc(w.f)}</b><div class="note">${esc(w.d)}</div></div><span class="pill gold">${w.wrong}× falsch</span></div>`).join('')}</div>`:''}`;
+}
 function vList(){
   const L=curLang();
   if(!L) return `<div class="panel center"><p>Noch keine Sprache angelegt.</p></div>`;
   const units=unitsOf(L);ui.lf=ui.lf.filter(u=>units.includes(u));
   const ws=sortWords(L.vocab.filter(w=>!ui.lf.length||ui.lf.includes(w.unit)),ui.ls.col,ui.ls.dir);
   const ar=c=>ui.ls.col===c?(ui.ls.dir>0?' ▲':' ▼'):'';
-  return `<div class="row"><button class="icon-btn" data-a="nav" data-v="home" aria-label="Zurück">←</button><h2 class="grow" style="margin:0">Vokabelliste</h2><span class="pill">${ws.length} Wörter</span></div>
+  return `<div class="row"><h2 class="grow" style="margin:0">Vokabeln</h2><span class="pill">${ws.length} Wörter</span></div>
   <div style="height:10px"></div>${langChips()}
   ${units.length>1?catDrop('list',ui.lf,units,'Alle Kategorien'):''}
   <div class="panel lt">
@@ -915,14 +1000,15 @@ function render(){
     case 'pack':h=vPack();break;
     case 'album':h=vAlbum();break;
     case 'options':h=vOptions();break;
+    case 'stats':h=vStats();break;
     case 'list':h=vList();break;
     case 'parent':h=vParent();break;
     default:h=vHome();
   }
   $('#app').innerHTML=h+(ui.modal?vModal():'');
   document.body.classList.toggle('immersive',ui.view==='quiz'||ui.view==='pack');
-  const tab=ui.view==='album'?'album':ui.view==='parent'?'parent':ui.view==='options'?'options':'home';
-  ['home','album','options','parent'].forEach(k=>$('#n-'+k).classList.toggle('on',k===tab));
+  const tab=({album:'album',parent:'parent',options:'options',stats:'stats',list:'list'})[ui.view]||'home';
+  ['home','list','album','stats','options','parent'].forEach(k=>$('#n-'+k).classList.toggle('on',k===tab));
   if(ui.view==='options'){const b=document.querySelector('.bk.on');if(b&&b.scrollIntoView)b.scrollIntoView({inline:'center',block:'nearest'});}
   if(lastView!==ui.view){window.scrollTo(0,0);lastView=ui.view;}
   if(ui.view==='quiz'){
@@ -938,13 +1024,13 @@ function startQuiz(){
   if(!ids.length){toast('Keine Wörter in dieser Liste');return;}
   const speak=S.mode==='speak';
   const dirOf=()=>speak?'d2f':(L.dir==='mix'?(Math.random()<.5?'f2d':'d2f'):L.dir);
-  Q={langId:L.id,mode:speak?'speak':'write',queue:ids.map(id=>({id,dir:dirOf(),first:true,attempts:0})),total:ids.length,phase:'ask',hint:0,earned:0,rightFirst:0,packs:0,fb:null,last:null,listening:false,speechMsg:''};
+  Q={langId:L.id,mode:speak?'speak':'write',queue:ids.map(id=>({id,dir:dirOf(),first:true,attempts:0})),total:ids.length,t0:Date.now(),phase:'ask',hint:0,earned:0,rightFirst:0,packs:0,fb:null,last:null,listening:false,speechMsg:''};
   ui.view='quiz';render();
 }
 function resolveAnswer(kind,heard){
   const L=curLang(),it=Q.queue.shift();Q.last=it;
   const w=L.vocab.find(x=>x.id===it.id);
-  let pts=0;const hinted=Q.hint>0,retry=!it.first;
+  let pts=0;const hinted=Q.hint>0,retry=!it.first,first=it.first;
   if(it.first){
     applyFirstTry(w,kind,hinted,Date.now());
     if(kind==='right'&&!hinted){pts=L.ppr;Q.rightFirst++;}
@@ -957,18 +1043,19 @@ function resolveAnswer(kind,heard){
     if(it.attempts<3)Q.queue.splice(Math.min(2,Q.queue.length),0,it);else dropped=true;
   }
   if(pts){Q.packs+=addPoints(L,pts);Q.earned+=pts;}
+  logAdd(L,new Date(),{p:pts,s:Math.min(Math.max((Date.now()-(Q.t0||Date.now()))/1000,0),60),a:first?1:0,r:first&&kind==='right'?1:0});
   save();
   Q.fb={kind,pts,hinted,retry,dropped,heard:heard||''};Q.phase='fb';Q.speechMsg='';render();
 }
 function nextQuestion(){
-  Q.hint=0;Q.phase='ask';Q.speechMsg='';
+  Q.hint=0;Q.phase='ask';Q.speechMsg='';Q.t0=Date.now();
   if(!Q.queue.length){finishQuiz();return;}
   render();
 }
 function finishQuiz(){
   const t=dateKey(0),s=S.streak;Q.streakAwards=[];
   if(s.last!==t){
-    s.count=(s.last===dateKey(-1))?s.count+1:1;s.last=t;
+    s.count=(s.last===dateKey(-1))?s.count+1:1;s.last=t;s.best=Math.max(s.best||0,s.count);
     const L=curLang();
     const c=S.streakCfg;
     if(streakDue(s.count,c.days)){
@@ -1097,7 +1184,8 @@ document.addEventListener('click',async e=>{
     case 'mode':S.mode=d.m==='speak'?'speak':'write';save();render();break;
     case 'start':startQuiz();break;
     case 'quit':stopListen();ui.view='home';render();break;
-    case 'show-list':ui.view='list';render();break;
+    case 'sm':ui.sm=d.v;render();break;
+    case 'sg':ui.sg=d.v;render();break;
     case 'list-sort':ui.ls=ui.ls.col===d.c?{col:d.c,dir:-ui.ls.dir}:{col:d.c,dir:1};render();break;
     case 'check':{
       const v=val('#ans');
