@@ -1,5 +1,5 @@
-const V = 'woerter-sammler-v10';
-const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
+const V = 'woerter-sammler-v11';
+const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', ...Array.from({length:10},(_,i)=>'./backs/'+(i+1)+'.svg')];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

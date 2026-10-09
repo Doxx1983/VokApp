@@ -153,6 +153,11 @@ nav button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width
 .theme{appearance:none;border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 14px;font:inherit;font-weight:800;font-size:17px;min-height:52px;width:100%;display:flex;align-items:center;gap:12px;cursor:pointer;text-align:left}
 .theme:last-child{border-bottom:0}
 .theme.on{background:var(--accent-soft)}
+.carousel{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 2px 10px;scrollbar-width:none;min-width:0}
+.carousel::-webkit-scrollbar{display:none}
+.bk{appearance:none;flex:0 0 62%;scroll-snap-align:center;border:3px solid var(--line);background:var(--surface);color:var(--ink);border-radius:18px;padding:8px;font:inherit;font-weight:800;font-size:15px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px}
+.bk img{width:100%;aspect-ratio:360/504;object-fit:cover;border-radius:12px;display:block}
+.bk.on{border-color:var(--accent);background:var(--accent-soft)}
 .dot{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);flex:none;display:inline-block}
 nav button.on{color:var(--accent-text,var(--accent));background:var(--accent-soft)}
 /* Eltern */
@@ -397,6 +402,7 @@ function themeVars(k){
 }
 const themeHex=t=>{const [s,l]=accOf(t),g=t.gray?(t.light?.2:.32):1;return rgbHex(hsl2rgb(t.h,s*g,l));};
 const themeKey=n=>n.replace(/^Hell/,'').toLowerCase()+(n.startsWith('Hell')?'1':'0');
+const BACKS=['Sternenhimmel','Dschungel','Ozean','Feuer','Neon','Regenbogen','Kristalle','Weltraum','Pixel','Einhorn'];
 const THEMES=THEME_DEFS.map(t=>({k:t.k,n:t.n,hex:t.hex||themeHex(t)})).sort((a,b)=>themeKey(a.n).localeCompare(themeKey(b.n),'de'));
 /* ZIP lesen (gespeichert oder deflate), ohne Bibliothek */
 function zipList(buf){
@@ -437,6 +443,7 @@ function nextStreakTarget(count,days){return (Math.floor(count/days)+1)*days;}
 function migrate(s){
   s.mode=s.mode==='speak'?'speak':'write';
   s.rewards=Array.isArray(s.rewards)?s.rewards:[];
+  s.cardBack=Math.min(Math.max(Math.round(+s.cardBack)||1,1),BACKS.length);
   s.theme=THEME_DEFS.some(t=>t.k===s.theme)?s.theme:'blau';
   delete s.streakRewards;
   const c=s.streakCfg=s.streakCfg||{};c.days=Math.max(1,Math.min(365,+c.days||5));
@@ -680,7 +687,7 @@ function vPack(){
   if(!P.opened) return `<h2 class="center">Dein Päckchen</h2><p class="center muted">Tippe aufs Päckchen, um es zu öffnen.</p>
   <button class="packbig" data-a="tear" aria-label="Päckchen öffnen">${packPic()}</button>`;
   return `<h2 class="center">Dein Päckchen</h2><p class="center muted" id="packhint">${all?'Das sind deine neuen Karten!':'Tippe auf die Karten zum Aufdecken.'}</p>
-  <div class="packgrid">${P.items.map((it,i)=>`<button class="flip ${it.on?'on':''} ${it.card.kind==='reward'||it.card.rarity==='e'||it.card.rarity==='l'?'hi':''}" data-a="flip" data-i="${i}" aria-label="Karte ${i+1}"><div class="flip-in"><div class="face back"></div><div class="face front">${cardFace(it.card,it.isNew)}</div></div></button>`).join('')}</div>
+  <div class="packgrid">${P.items.map((it,i)=>`<button class="flip ${it.on?'on':''} ${it.card.kind==='reward'||it.card.rarity==='e'||it.card.rarity==='l'?'hi':''}" data-a="flip" data-i="${i}" aria-label="Karte ${i+1}"><div class="flip-in"><div class="face back" style="background:url(backs/${S.cardBack}.svg) center/cover no-repeat"></div><div class="face front">${cardFace(it.card,it.isNew)}</div></div></button>`).join('')}</div>
   <div id="packact">${packActions()}</div>`;
 }
 
@@ -882,7 +889,12 @@ function vOptions(){
   return `<h2>Optionen</h2>
   <div class="panel"><h3>Farbschema</h3>
   <button class="themesel" data-a="theme-toggle" aria-expanded="${!!ui.themeOpen}"><span class="dot" style="background:${cur.hex}"></span><span class="grow">${cur.n}</span><span>${ui.themeOpen?'▲':'▼'}</span></button>
-  ${ui.themeOpen?`<div class="themelist">${THEMES.map(t=>`<button class="theme ${S.theme===t.k?'on':''}" data-a="theme" data-k="${t.k}"><span class="dot" style="background:${t.hex}"></span>${t.n}</button>`).join('')}</div>`:''}</div>`;
+  ${ui.themeOpen?`<div class="themelist">${THEMES.map(t=>`<button class="theme ${S.theme===t.k?'on':''}" data-a="theme" data-k="${t.k}"><span class="dot" style="background:${t.hex}"></span>${t.n}</button>`).join('')}</div>`:''}</div>
+  <div class="panel"><h3>Kartenrücken</h3>
+  <div class="row" style="flex-wrap:nowrap"><button class="icon-btn" data-a="back-step" data-d="-1" aria-label="Zurück">‹</button>
+  <div class="carousel grow" id="carousel">${BACKS.map((n,i)=>`<button class="bk ${S.cardBack===i+1?'on':''}" data-a="back" data-n="${i+1}" aria-pressed="${S.cardBack===i+1}"><img src="backs/${i+1}.svg" alt="" loading="lazy"><span>${S.cardBack===i+1?'✓ ':''}${n}</span></button>`).join('')}</div>
+  <button class="icon-btn" data-a="back-step" data-d="1" aria-label="Weiter">›</button></div>
+  <p class="note center">Wische oder tippe auf ‹ ›. So sehen die Karten im Päckchen aus, bevor sie aufgedeckt werden.</p></div>`;
 }
 function render(){
   applyTheme();
@@ -901,6 +913,7 @@ function render(){
   document.body.classList.toggle('immersive',ui.view==='quiz'||ui.view==='pack');
   const tab=ui.view==='album'?'album':ui.view==='parent'?'parent':ui.view==='options'?'options':'home';
   ['home','album','options','parent'].forEach(k=>$('#n-'+k).classList.toggle('on',k===tab));
+  if(ui.view==='options'){const b=document.querySelector('.bk.on');if(b&&b.scrollIntoView)b.scrollIntoView({inline:'center',block:'nearest'});}
   if(lastView!==ui.view){window.scrollTo(0,0);lastView=ui.view;}
   if(ui.view==='quiz'){
     if(Q.phase==='ask'){const a=$('#ans');if(a)a.focus();}else if(Q.phase==='fb'){const b=$('#nextbtn');if(b)b.focus();}
@@ -1153,6 +1166,8 @@ document.addEventListener('click',async e=>{
       ui.vtext='';save();render();
       toast(n+' hinzugefügt'+(dup?`, ${dup} doppelt`:'')+(skipped?`, ${skipped} Zeile(n) übersprungen`:''));break;}
     case 'theme':S.theme=THEMES.some(t=>t.k===d.k)?d.k:'blau';ui.themeOpen=false;save();render();break;
+    case 'back':S.cardBack=clamp(d.n,1,BACKS.length);save();render();break;
+    case 'back-step':S.cardBack=((S.cardBack-1+(+d.d)+BACKS.length)%BACKS.length)+1;save();render();break;
     case 'theme-toggle':ui.themeOpen=!ui.themeOpen;render();break;
     case 'toggle-cats':ui.cats=!ui.cats;render();break;
     case 'open-unit':ui.openUnit=ui.openUnit===d.u?'':d.u;render();break;
