@@ -354,23 +354,16 @@ function cutoutBlack(d,w,h){
   }
   return x1<0?null:[x0,y0,x1+1,y1+1];
 }
-/* Serien-Belohnungen: r.days = Länge, r.every = alle X Tage statt nur bei Tag X */
-function matchStreak(count,rewards){
-  return rewards.filter(r=>r.active!==false&&(r.every?(count>0&&count%r.days===0):count===r.days));
-}
-function nextStreakTarget(count,rewards){
-  let best=null;
-  for(const r of rewards){
-    if(r.active===false) continue;
-    const t=r.every?(Math.floor(count/r.days)+1)*r.days:(r.days>count?r.days:null);
-    if(t!==null&&(best===null||t<best)) best=t;
-  }
-  return best;
-}
+/* Serie: alle cfg.days Tage in Folge ist eine Serie abgeschlossen */
+function streakDue(count,days){return count>0&&days>0&&count%days===0;}
+function nextStreakTarget(count,days){return (Math.floor(count/days)+1)*days;}
 function migrate(s){
   s.mode=s.mode==='speak'?'speak':'write';
   s.rewards=Array.isArray(s.rewards)?s.rewards:[];
-  s.streakRewards=Array.isArray(s.streakRewards)?s.streakRewards:[];
+  delete s.streakRewards;
+  const c=s.streakCfg=s.streakCfg||{};c.days=Math.max(1,Math.min(365,+c.days||5));
+  c.def=c.def||{};c.def.active=!!c.def.active;c.def.kind=c.def.kind==='text'?'text':'pack';c.def.packs=Math.max(1,Math.min(10,+c.def.packs||1));c.def.rid=c.def.rid||'';
+  c.nextRid=c.nextRid||'';
   s.streak=s.streak||{last:null,count:0};
   s.langs.forEach(l=>{
     l.wins=l.wins||[];l.owned=l.owned||{};l.cards=l.cards||[];l.vocab=l.vocab||[];
@@ -409,7 +402,7 @@ function seed(){
   const L=newLang('Englisch');
   const ex=[['dog','Hund'],['cat','Katze'],['house','Haus'],['apple','Apfel'],['red','rot'],['school','Schule'],['book','Buch'],['friend','Freund'],['water','Wasser'],['to run','rennen']];
   ex.forEach(([f,d])=>L.vocab.push({id:uid(),f,d,unit:'Beispiel (bitte löschen)',box:1,due:0,seen:0,right:0,wrong:0}));
-  return migrate({v:1,pinHash:null,mode:'write',rewards:[],streakRewards:[],streak:{last:null,count:0},activeLang:L.id,langs:[L]});
+  return migrate({v:1,pinHash:null,mode:'write',rewards:[],streak:{last:null,count:0},activeLang:L.id,langs:[L]});
 }
 function load(){
   try{const r=localStorage.getItem(KEY);if(r){const s=JSON.parse(r);if(s&&Array.isArray(s.langs))return migrate(s);}}catch(e){}
@@ -479,7 +472,7 @@ function starterBlob(emoji,color){
 }
 
 /* ================= Zustand der Oberfläche ================= */
-const ui={view:'home',unit:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:'',ls:{col:'f',dir:1},cats:true};
+const ui={view:'home',unit:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:'',ls:{col:'f',dir:1},cats:false};
 let Q=null,deferredInstall=null,confirmT,rec=null;
 
 /* ================= Ansichten ================= */
@@ -498,7 +491,7 @@ function vHome(){
   const pool=ui.unit?L.vocab.filter(w=>w.unit===ui.unit).length:total;
   const n=Math.min(L.sessionSize,pool);
   const pct=Math.min(100,Math.round(L.points/L.goal*100));
-  const st=streakNow(),nextT=nextStreakTarget(st,S.streakRewards);
+  const st=streakNow(),nextT=(S.streakCfg.def.active||S.streakCfg.nextRid)?nextStreakTarget(st,S.streakCfg.days):0;
   return `${langChips()}
   <div class="panel">
     <div class="packbox">
@@ -525,7 +518,7 @@ function vHome(){
     <div class="stat"><b>${known}</b><span>sicher gelernt</span></div>
     <div class="stat"><b>${dueN}</b><span>heute dran</span></div>
   </div>
-  ${st>0?`<p class="center"><span class="pill gold">Serie: ${st} ${st===1?'Tag':'Tage'}</span>${nextT?`<br><span class="note">Nächste Serien-Belohnung bei ${nextT} Tagen</span>`:''}</p>`:''}`
+  ${st>0?`<p class="center"><span class="pill gold">Serie: ${st} ${st===1?'Tag':'Tage'}</span>${nextT?`<br><span class="note">Nächste Serien-Belohnung nach ${nextT} Tagen</span>`:''}</p>`:''}`
   :`<div class="panel center"><h3>Noch keine Vokabeln</h3><p class="muted">Mama oder Papa tragen sie im Elternbereich ein.</p><button class="btn primary" data-a="nav" data-v="parent">Zum Elternbereich</button></div>`}`;
 }
 
@@ -648,7 +641,7 @@ function vParent(){
   h+=secBtn('vocab','Vokabeln');if(ui.sec==='vocab')h+=L?pVocab(L):noLang();
   h+=secBtn('cards','Karten');if(ui.sec==='cards')h+=L?pCards(L):noLang();
   h+=secBtn('prizes','Spezielle Belohnungen');if(ui.sec==='prizes')h+=L?pPrizes(L):noLang();
-  h+=secBtn('streak','Serien-Belohnungen');if(ui.sec==='streak')h+=pStreak();
+  h+=secBtn('streak','Serien-Belohnung');if(ui.sec==='streak')h+=pStreak();
   h+=secBtn('reward','Punkte &amp; Abfrage');if(ui.sec==='reward')h+=L?pReward(L):noLang();
   h+=secBtn('backup','Sicherung &amp; PIN');if(ui.sec==='backup')h+=pBackup();
   return h;
@@ -708,25 +701,22 @@ function pPrizes(L){
   ${open.length?open.map(w=>`<div class="urow"><div class="t"><b>${esc(w.text)}</b><div class="note">${fmtDate(w.ts)} · ${winLabel(w)}</div></div><button class="btn small primary" data-a="redeem" data-id="${w.id}">Eingelöst</button></div>`).join(''):'<p class="muted">Nichts offen.</p>'}
   </div>`;
 }
-function streakFields(p,r){
-  r=r||{days:5,kind:'pack',packs:1,text:'',every:false};
-  return `<div class="field"><label for="${p}-days">Länge der Serie in Tagen</label><input id="${p}-days" class="in" type="number" inputmode="numeric" min="1" max="365" value="${r.days}"></div>
-  <div class="field"><label for="${p}-kind">Belohnung</label><select id="${p}-kind" class="in" data-change="srkind" data-p="${p}"><option value="pack" ${r.kind==='pack'?'selected':''}>Päckchen</option><option value="text" ${r.kind==='text'?'selected':''}>Sonderbelohnung (Text)</option></select></div>
-  <div class="field" id="${p}-packs-w" ${r.kind==='pack'?'':'hidden'}><label for="${p}-packs">Anzahl Päckchen</label><input id="${p}-packs" class="in" type="number" inputmode="numeric" min="1" max="10" value="${r.packs||1}"></div>
-  <div class="field" id="${p}-text-w" ${r.kind==='text'?'':'hidden'}><label for="${p}-text">Text</label><input id="${p}-text" class="in" maxlength="80" value="${esc(r.text||'')}" placeholder="z. B. Ausflug ins Schwimmbad"></div>
-  <label class="chk"><input type="checkbox" id="${p}-every" ${r.every?'checked':''}> Immer wieder vergeben (alle X Tage statt nur einmal bei Tag X)</label>`;
-}
-function readStreak(p){
-  return {days:clamp(val('#'+p+'-days'),1,365),kind:val('#'+p+'-kind')==='text'?'text':'pack',packs:clamp(val('#'+p+'-packs')||1,1,10),text:val('#'+p+'-text').trim(),every:!!($('#'+p+'-every')&&$('#'+p+'-every').checked)};
+function rewardOpts(sel){
+  return '<option value="">– keine –</option>'+S.rewards.map(r=>`<option value="${r.id}" ${r.id===sel?'selected':''}>${esc(r.text)}${r.active?'':' (pausiert)'}</option>`).join('');
 }
 function pStreak(){
-  const rs=S.streakRewards.slice().sort((a,b)=>a.days-b.days);
+  const c=S.streakCfg,d=c.def,sr=S.rewards.find(r=>r.id===c.nextRid);
   return `<div class="secbody">
-  <p class="note">Wer an mehreren Tagen hintereinander übt, bekommt eine Belohnung. Sie geht an die Sprache, mit der gerade geübt wurde. Aktuelle Serie: ${streakNow()} ${streakNow()===1?'Tag':'Tage'}.</p>
-  ${streakFields('sr')}
-  <button class="btn primary block" data-a="add-streak">Hinzufügen</button>
-  <h3 style="margin-top:18px">Hinterlegte Serien-Belohnungen</h3>
-  ${rs.length?rs.map(r=>`<div class="urow"><div class="t"><b>${r.every?'Alle '+r.days+(r.days===1?' Tag':' Tage'):'Bei '+r.days+(r.days===1?' Tag':' Tagen')}</b><div class="note">${r.kind==='pack'?(r.packs===1?'1 Päckchen':r.packs+' Päckchen'):esc(r.text)}</div></div><button class="tog ${r.active!==false?'on':''}" data-a="toggle-streak" data-id="${r.id}">${r.active!==false?'Aktiv':'Aus'}</button><button class="x edit" data-a="edit-streak" data-id="${r.id}" aria-label="Bearbeiten">✎</button></div>`).join(''):'<p class="muted">Noch keine Serien-Belohnungen.</p>'}
+  <p class="note">Eine Serie ist abgeschlossen, wenn so viele Tage hintereinander geübt wurde. Die Belohnung geht an die Sprache, mit der gerade geübt wurde. Aktuelle Serie: ${streakNow()} ${streakNow()===1?'Tag':'Tage'}.</p>
+  <div class="field"><label for="sc-days">Länge einer Serie in Tagen</label><input id="sc-days" class="in" type="number" inputmode="numeric" min="1" max="365" value="${c.days}" data-change="scfg" data-k="days"></div>
+  <h3 style="margin-top:14px">Standard-Belohnung</h3>
+  <div class="urow"><div class="t"><b>Nach jeder Serie</b></div><button class="tog ${d.active?'on':''}" data-a="toggle-sdef">${d.active?'Aktiv':'Aus'}</button></div>
+  <div class="field"><label for="sc-kind">Belohnung</label><select id="sc-kind" class="in" data-change="scfg" data-k="kind"><option value="pack" ${d.kind==='pack'?'selected':''}>Päckchen</option><option value="text" ${d.kind==='text'?'selected':''}>Spezielle Belohnung</option></select></div>
+  ${d.kind==='pack'?`<div class="field"><label for="sc-packs">Anzahl Päckchen</label><input id="sc-packs" class="in" type="number" inputmode="numeric" min="1" max="10" value="${d.packs}" data-change="scfg" data-k="packs"></div>`
+   :`<div class="field"><label for="sc-rid">Spezielle Belohnung</label><select id="sc-rid" class="in" data-change="scfg" data-k="rid">${rewardOpts(d.rid)}</select></div>${S.rewards.length?'':'<p class="muted">Lege erst unter „Spezielle Belohnungen“ eine an.</p>'}`}
+  <h3 style="margin-top:18px">Für die nächste Serie</h3>
+  <p class="note">Ersetzt die Standard-Belohnung einmalig. Danach gilt wieder die Standard-Belohnung.</p>
+  <div class="field"><label for="sc-next">Spezielle Belohnung</label><select id="sc-next" class="in" data-change="scfg" data-k="next">${rewardOpts(c.nextRid)}</select></div>
   </div>`;
 }
 function pReward(L){
@@ -773,12 +763,6 @@ function vModal(){
     <div class="field"><label for="ue-name">Neuer Name</label><input id="ue-name" class="in" value="${esc(m.u)}" maxlength="40"></div>
     <p class="note">Gibt es den Namen schon, werden beide Kategorien zusammengelegt.</p>
     <button class="btn primary block" data-a="save-unit" data-u="${esc(m.u)}">Speichern</button>
-    <button class="btn block" style="margin-top:8px" data-a="close-modal">Abbrechen</button>`);
-  }
-  if(m.t==='streak'){
-    const r=S.streakRewards.find(x=>x.id===m.id);if(!r)return '';
-    return wrap(`<h3>Serien-Belohnung bearbeiten</h3>${streakFields('se',r)}
-    <div class="row"><button class="btn primary grow" data-a="save-streak" data-id="${r.id}">Speichern</button>${confBtn('del-streak:'+r.id,'Löschen','')}</div>
     <button class="btn block" style="margin-top:8px" data-a="close-modal">Abbrechen</button>`);
   }
   if(m.t==='prize'){
@@ -866,9 +850,14 @@ function finishQuiz(){
   if(s.last!==t){
     s.count=(s.last===dateKey(-1))?s.count+1:1;s.last=t;
     const L=curLang();
-    for(const r of matchStreak(s.count,S.streakRewards)){
-      if(r.kind==='pack'){L.packs+=r.packs||1;Q.streakAwards.push({kind:'pack',packs:r.packs||1,days:s.count});}
-      else{L.wins.push({id:uid(),rid:r.id,text:r.text,rarity:'e',src:'streak',days:s.count,ts:Date.now(),redeemed:false});Q.streakAwards.push({kind:'text',text:r.text,days:s.count});}
+    const c=S.streakCfg;
+    if(streakDue(s.count,c.days)){
+      const sp=c.nextRid&&S.rewards.find(r=>r.id===c.nextRid);
+      let g=null;
+      if(sp)g={kind:'text',rid:sp.id};else if(c.def.active)g=c.def.kind==='text'?(S.rewards.find(r=>r.id===c.def.rid)?{kind:'text',rid:c.def.rid}:null):{kind:'pack'};
+      if(sp)c.nextRid='';
+      if(g&&g.kind==='pack'){const n=c.def.packs||1;L.packs+=n;Q.streakAwards.push({kind:'pack',packs:n,days:s.count});}
+      else if(g){const r=S.rewards.find(x=>x.id===g.rid);L.wins.push({id:uid(),rid:r.id,text:r.text,rarity:r.rarity,src:'streak',days:s.count,ts:Date.now(),redeemed:false});if(r.once)r.active=false;Q.streakAwards.push({kind:'text',text:r.text,days:s.count});}
     }
   }
   save();ui.view='summary';render();
@@ -1086,19 +1075,7 @@ document.addEventListener('click',async e=>{
       const id=d.key.split(':')[1];S.rewards=S.rewards.filter(r=>r.id!==id);save();ui.modal=null;render();break;}
     case 'redeem':{
       const w=L.wins.find(x=>x.id===d.id);if(w){w.redeemed=true;w.redeemedTs=Date.now();save();render();}break;}
-    case 'add-streak':{
-      const r=readStreak('sr');
-      if(r.kind==='text'&&!r.text){toast('Bitte einen Text eingeben.');break;}
-      S.streakRewards.push({id:uid(),active:true,...r});save();render();toast('Serien-Belohnung hinterlegt');break;}
-    case 'toggle-streak':{const r=S.streakRewards.find(x=>x.id===d.id);if(r){r.active=r.active===false;save();render();}break;}
-    case 'edit-streak':ui.modal={t:'streak',id:d.id};render();break;
-    case 'save-streak':{
-      const r=S.streakRewards.find(x=>x.id===d.id);if(!r)break;
-      const n=readStreak('se');if(n.kind==='text'&&!n.text){toast('Bitte einen Text eingeben.');break;}
-      Object.assign(r,n);save();ui.modal=null;render();break;}
-    case 'del-streak':{
-      if(!ask(d.key))break;
-      const id=d.key.split(':')[1];S.streakRewards=S.streakRewards.filter(r=>r.id!==id);save();ui.modal=null;render();break;}
+    case 'toggle-sdef':S.streakCfg.def.active=!S.streakCfg.def.active;save();render();break;
     case 'del-packimg':{if(!ask(d.key))break;await delImg(PACK_KEY);render();toast('Standard-Päckchen wird gezeigt');break;}
     case 'starter':addStarter();break;
     case 'gift':if(L){L.packs++;save();toast('1 Päckchen geschenkt');}break;
@@ -1112,7 +1089,15 @@ document.addEventListener('change',async e=>{
   const el=e.target,k=el.dataset&&el.dataset.change;if(!k)return;
   const L=curLang();
   if(k==='imprar')ui.imprar=el.value;
-  else if(k==='srkind'){const p=el.dataset.p;const a=$('#'+p+'-packs-w'),b=$('#'+p+'-text-w');if(a)a.hidden=el.value!=='pack';if(b)b.hidden=el.value!=='text';}
+  else if(k==='scfg'){
+    const c=S.streakCfg,key=el.dataset.k;
+    if(key==='days')c.days=clamp(el.value,1,365);
+    else if(key==='kind')c.def.kind=el.value==='text'?'text':'pack';
+    else if(key==='packs')c.def.packs=clamp(el.value,1,10);
+    else if(key==='rid')c.def.rid=el.value;
+    else if(key==='next')c.nextRid=el.value;
+    save();render();
+  }
   else if(k==='packimg'){
     const f=el.files[0];el.value='';if(!f)return;
     try{const b=await packImageBlob(f);await putImg(PACK_KEY,b);toast('Päckchen-Bild gespeichert');}catch(err){toast('Das Bild konnte nicht gelesen werden.');}
