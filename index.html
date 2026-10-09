@@ -354,6 +354,39 @@ function cutoutBlack(d,w,h){
   }
   return x1<0?null:[x0,y0,x1+1,y1+1];
 }
+/* ZIP lesen (gespeichert oder deflate), ohne Bibliothek */
+function zipList(buf){
+  const u=new Uint8Array(buf),dv=new DataView(buf);let e=-1;
+  for(let i=u.length-22;i>=Math.max(0,u.length-65558);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break;}}
+  if(e<0)throw new Error('kein ZIP');
+  const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const out=[];
+  for(let k=0;k<n;k++){
+    if(dv.getUint32(p,true)!==0x02014b50)break;
+    const meth=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),el=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+    const name=new TextDecoder('utf-8').decode(u.subarray(p+46,p+46+nl));p+=46+nl+el+cl;
+    if(name.endsWith('/'))continue;
+    const ds=off+30+dv.getUint16(off+26,true)+dv.getUint16(off+28,true);
+    out.push({name,meth,raw:u.subarray(ds,ds+cs)});
+  }
+  return out;
+}
+async function zipData(en){
+  if(en.meth===0)return en.raw;
+  if(en.meth!==8)throw new Error('Format nicht unterstützt');
+  return new Uint8Array(await new Response(new Blob([en.raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+}
+function zipImage(name){
+  if(/(^|\/)(__MACOSX|\.)/.test(name)||/(^|\/)\./.test(name))return null;
+  const m=name.toLowerCase().match(/\.(jpe?g|png|webp|gif|bmp|avif)$/);
+  return m?'image/'+(m[1]==='jpg'?'jpeg':m[1]):null;
+}
+function zipRarity(path,def){
+  const segs=path.toLowerCase().split('/').slice(0,-1);
+  for(const s of segs.reverse()){
+    if(s.startsWith('normal'))return 'n';if(s.startsWith('selten'))return 's';if(s.startsWith('episch'))return 'e';if(s.startsWith('legend'))return 'l';
+  }
+  return def;
+}
 /* Serie: alle cfg.days Tage in Folge ist eine Serie abgeschlossen */
 function streakDue(count,days){return count>0&&days>0&&count%days===0;}
 function nextStreakTarget(count,days){return (Math.floor(count/days)+1)*days;}
@@ -672,7 +705,9 @@ function pCards(L){
   <div class="field"><label for="imprar">Seltenheit der neuen Karten</label><select id="imprar" class="in" data-change="imprar">${rarOptions(ui.imprar)}</select></div>
   <label class="btn primary block" for="filein">Bilder aus der Galerie wählen</label>
   <input id="filein" type="file" accept="image/*" multiple hidden data-change="files">
-  <p class="note">Der Dateiname wird zum Kartennamen. Jede Seltenheit am besten in einem eigenen Schwung hinzufügen.</p>
+  <label class="btn block" for="zipin" style="margin-top:8px">ZIP-Datei mit Bildern wählen</label>
+  <input id="zipin" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden data-change="files">
+  <p class="note">Der Dateiname wird zum Kartennamen. Jede Seltenheit am besten in einem eigenen Schwung hinzufügen. In einer ZIP-Datei bestimmen Ordner namens „normal“, „selten“, „episch“ oder „legendär“ die Seltenheit; alle anderen Bilder bekommen die oben gewählte.</p>
   <button class="btn block" data-a="starter">Platzhalter-Karten hinzufügen (12 Tiere)</button>
   <h3 style="margin-top:18px">Päckchen-Bild</h3>
   <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><div class="packimg" style="width:56px">${packPic()}</div>
@@ -927,11 +962,31 @@ function ask(key){
   if(ui.confirm!==key){ui.confirm=key;clearTimeout(confirmT);confirmT=setTimeout(()=>{ui.confirm=null;render();},4000);render();return false;}
   ui.confirm=null;clearTimeout(confirmT);return true;
 }
+async function importZip(f){
+  const L=curLang();let n=0;
+  try{
+    const list=zipList(await f.arrayBuffer()).filter(en=>zipImage(en.name));
+    for(const en of list){
+      setBusy(`Importiere ${n+1} von ${list.length} …`);
+      try{
+        const data=await zipData(en);
+        const blob=await fileToBlob(new Blob([data],{type:zipImage(en.name)}));
+        const id=uid();await putImg(id,blob);
+        L.cards.push({id,name:cleanCardName(en.name.split('/').pop()),rarity:zipRarity(en.name,ui.imprar)});n++;
+      }catch(e){}
+    }
+  }catch(e){setBusy('');toast('Die ZIP-Datei konnte nicht gelesen werden.');return;}
+  return n;
+}
 async function importFiles(files){
   const L=curLang();if(!L||!files.length)return;
+  const zips=files.filter(f=>/\.zip$/i.test(f.name)),imgs=files.filter(f=>!/\.zip$/i.test(f.name));
   let n=0;
+  for(const z of zips){const k=await importZip(z);if(k===undefined)return;n+=k;}
+  files=imgs;
+  let i=0;
   for(const f of files){
-    setBusy(`Importiere ${n+1} von ${files.length} …`);
+    setBusy(`Importiere ${++i} von ${files.length} …`);
     try{const blob=await fileToBlob(f);const id=uid();await putImg(id,blob);L.cards.push({id,name:cleanCardName(f.name),rarity:ui.imprar});n++;}catch(e){}
   }
   save();setBusy('');toast(n+' Karten hinzugefügt');render();
