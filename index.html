@@ -190,6 +190,12 @@ nav button.on{color:var(--accent-text,var(--accent));background:var(--accent-sof
 .busy{background:var(--warn-bg);color:var(--warn);border-radius:12px;padding:8px 12px;font-weight:800;margin:8px 0}
 .modal{position:fixed;inset:0;background:rgba(5,12,32,.74);display:grid;place-items:center;padding:16px;z-index:20;overflow-y:auto}
 .mbox{background:var(--surface);border-radius:20px;padding:18px;width:100%;max-width:340px}
+#lock{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;padding:24px}
+#lock[hidden]{display:none}
+.lockbox{width:min(420px,100%);text-align:center}
+.lockbox h1{font-size:36px;margin:0 0 6px}
+.lcount{font-size:84px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--accent-text,var(--accent));margin:8px 0 28px;line-height:1}
+.lockbox .err{color:var(--bad);font-weight:800}
 #toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-weight:800;font-size:15px;z-index:30;max-width:90vw;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s}
 #toast.on{opacity:1}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -205,6 +211,7 @@ nav button.on{color:var(--accent-text,var(--accent));background:var(--accent-sof
   <button data-a="nav" data-v="options" id="n-options"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.7 0 2-1.2 1.4-2.2-.7-1.2.1-2.3 1.4-2.3H17a4 4 0 0 0 4-4c0-5-4-9.5-9-9.5z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg>Optionen</button>
   <button data-a="nav" data-v="parent" id="n-parent"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Eltern</button>
 </div></nav>
+<div id="lock" hidden></div>
 <div id="toast" role="status"></div>
 <script>
 'use strict';
@@ -462,6 +469,7 @@ function migrate(s){
   s.mode=s.mode==='speak'?'speak':'write';
   s.rewards=Array.isArray(s.rewards)?s.rewards:[];
   s.cardBack=Math.min(Math.max(Math.round(+s.cardBack)||1,1),BACKS.length);
+  s.pomo=s.pomo&&typeof s.pomo==='object'&&+s.pomo.start?s.pomo:null;
   s.streak=s.streak||{last:null,count:0};s.streak.best=Math.max(s.streak.best||0,s.streak.count||0);
   s.theme=THEME_DEFS.some(t=>t.k===s.theme)?s.theme:'blau';
   delete s.streakRewards;
@@ -507,6 +515,17 @@ function seriesWeeks(log,now,n){
   return out;
 }
 function fmtDur(s){s=Math.round(s||0);if(s<60)return s+' Sek.';const m=Math.round(s/60);if(m<60)return m+' Min.';return Math.floor(m/60)+':'+String(m%60).padStart(2,'0')+' Std.';}
+/* Pomodoro: 25 Min. Lernzeit, dann 5 Min. gesperrte Pause. Pause nach Ende einer Runde > 5 Min. setzt den Timer zurück. */
+const POMO_WORK=25*60000,POMO_BREAK=5*60000,POMO_IDLE=5*60000;
+function pomoStep(p,now){
+  if(!p)return null;
+  if(p.lock)return now>=p.lock?null:p;
+  if(p.idle!=null&&now-p.idle>=POMO_IDLE)return null;
+  if(now-p.start>=POMO_WORK){const u=p.start+POMO_WORK+POMO_BREAK;return now>=u?null:{...p,lock:u};}
+  return p;
+}
+function pomoOnStart(p,now){p=pomoStep(p,now);return p?{...p,idle:null}:{start:now,idle:null};}
+function pomoOnEnd(p,now){return p&&!p.lock?{...p,idle:now}:p;}
 //LOGIC-END
 
 /* ================= Hilfen ================= */
@@ -643,7 +662,7 @@ function vHome(){
     </div>
     ${L.packs>0?`<button class="btn gold block" style="margin-top:12px" data-a="open-pack">Päckchen öffnen</button>`:''}
   </div>
-  ${st>0?`<div class="panel streak"><div class="row" style="flex-wrap:nowrap"><span class="flame">${ICON_FLAME}</span><div class="grow"><b>Serie: ${st} ${st===1?'Tag':'Tage'}</b>${nextT?`<div class="note">Nächste Serien-Belohnung nach ${nextT} Tagen</div>`:''}</div></div></div>`:''}
+  <div class="panel ${st>0?'streak':''}"><div class="row" style="flex-wrap:nowrap"><span class="flame" style="${st>0?'':'color:var(--muted);filter:none'}">${ICON_FLAME}</span><div class="grow"><b>${st>0?`Du hast ${st} ${st===1?'Tag':'Tage'} hintereinander Vokabeln gelernt!`:'Starte heute eine neue Serie!'}</b>${st>0&&nextT?`<div class="note">Nächste Serien-Belohnung nach ${nextT} Tagen</div>`:''}</div></div></div>
   ${total?`
   ${units.length>1?catDrop('home',ui.unit,units,'Alle Wörter'):''}
   <div class="seg" role="group" aria-label="Übungsart">
@@ -653,7 +672,7 @@ function vHome(){
   <div class="seg seg3" role="group" aria-label="Wörter pro Lerneinheit">${[10,20,30].map(k=>`<button class="${L.sessionSize===k?'on':''}" data-a="size" data-n="${k}">${k} Wörter</button>`).join('')}</div>
   ${S.mode==='speak'&&!SRClass()?`<p class="note">Auf diesem Gerät gibt es keine Spracherkennung. Du sagst das Wort laut und bewertest dich danach selbst.</p>`:''}
   <div style="height:128px"></div>
-  <div class="startbar"><button class="btn primary block ${st>0?'streakon':''}" style="font-size:22px;min-height:96px" data-a="start">Lernen starten · ${n} Wörter</button></div>`
+  <div class="startbar"><button class="btn primary block ${st>0?'streakon':''}" style="font-size:22px;min-height:96px" data-a="start">Lernen starten</button></div>`
   :`<div class="panel center"><h3>Noch keine Vokabeln</h3><p class="muted">Mama oder Papa tragen sie im Elternbereich ein.</p><button class="btn primary" data-a="nav" data-v="parent">Zum Elternbereich</button></div>`}`;
 }
 
@@ -981,6 +1000,39 @@ function vModal(){
 
 let lastView=null;
 const THEME_PROPS=['--streak','--accent-text','--bg','--surface','--surface-2','--ink','--muted','--line','--accent','--accent-2','--accent-dark','--accent-ink','--accent-soft','--good','--good-bg','--bad','--bad-bg','--warn','--warn-bg','--shadow','color-scheme'];
+const POMO_HB='ws-pomo-hb';
+function renderLock(){
+  const el=$('#lock'),p=S.pomo,on=!!(p&&p.lock),app=$('#app'),nav=document.querySelector('nav');
+  if(app)app.inert=on;if(nav)nav.inert=on;
+  if(!on){if(el)el.hidden=true;return;}
+  const left=Math.max(0,Math.ceil((p.lock-Date.now())/1000)),t=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');
+  const sig=(ui.lockPin?'p':'b')+ui.lockErr;
+  if(el.hidden||el.dataset.sig!==sig){
+    el.hidden=false;el.dataset.sig=sig;
+    el.innerHTML=`<div class="lockbox" role="alertdialog" aria-labelledby="lt"><h1 id="lt">Mach mal Pause!</h1><div class="lcount" id="lcount"></div>${ui.lockPin?`<div class="field"><input id="lpin" class="in ans" type="password" inputmode="numeric" maxlength="8" autocomplete="off" aria-label="PIN" placeholder="PIN"></div>${ui.lockErr?`<p class="err">${ui.lockErr}</p>`:''}<button class="btn primary block" data-a="unlock-go">OK</button>`:`<button class="btn block" data-a="unlock">Entsperren</button>`}</div>`;
+    const i=$('#lpin');if(i&&i.focus)i.focus();
+  }
+  const c=$('#lcount');if(c)c.textContent=t;
+}
+function endPause(){
+  const now=Date.now();
+  S.pomo=(ui.view==='quiz'&&Q)?{start:now,idle:null}:null;
+  if(Q)Q.t0=now;
+  ui.lockPin=false;ui.lockErr='';save();renderLock();render();
+}
+function pomoTick(){
+  const now=Date.now(),before=S.pomo,wasLocked=!!(before&&before.lock);
+  S.pomo=pomoStep(before,now);
+  const isLocked=!!(S.pomo&&S.pomo.lock);
+  if(S.pomo!==before){
+    if(wasLocked&&!isLocked&&ui.view==='quiz'&&Q){S.pomo={start:now,idle:null};Q.t0=now;}
+    save();
+    if(wasLocked&&!isLocked)render();
+  }
+  if(isLocked&&!wasLocked){if(Q&&Q.listening)stopListen();ui.lockPin=false;ui.lockErr='';}
+  renderLock();
+  if(!isLocked){try{localStorage.setItem(POMO_HB,String(now));}catch(e){}}
+}
 const STREAK_OVR={gelb:'#ff7a00',hellorange:'#ffcc00'};
 function applyTheme(){
   const st=document.documentElement.style,v=themeVars(S.theme);
@@ -1021,6 +1073,7 @@ function render(){
   const tab=({album:'album',parent:'parent',options:'options',stats:'stats',list:'list'})[ui.view]||'home';
   ['home','list','album','stats','options','parent'].forEach(k=>$('#n-'+k).classList.toggle('on',k===tab));
   if(ui.view==='options'){const b=document.querySelector('.bk.on');if(b&&b.scrollIntoView)b.scrollIntoView({inline:'center',block:'nearest'});}
+  if(lastView==='quiz'&&ui.view!=='quiz'&&S.pomo&&!S.pomo.lock){S.pomo=pomoOnEnd(S.pomo,Date.now());save();}
   if(lastView!==ui.view){window.scrollTo(0,0);lastView=ui.view;}
   if(ui.view==='quiz'){
     if(Q.phase==='ask'){const a=$('#ans');if(a)a.focus();}else if(Q.phase==='fb'){const b=$('#nextbtn');if(b)b.focus();}
@@ -1033,6 +1086,7 @@ function startQuiz(){
   const L=curLang();if(!L||!L.vocab.length)return;
   const ids=pickSession(L.vocab,ui.unit,L.sessionSize,Date.now());
   if(!ids.length){toast('Keine Wörter in dieser Liste');return;}
+  S.pomo=pomoOnStart(S.pomo,Date.now());
   const speak=S.mode==='speak';
   const dirOf=()=>speak?'d2f':(L.dir==='mix'?(Math.random()<.5?'f2d':'d2f'):L.dir);
   Q={langId:L.id,mode:speak?'speak':'write',queue:ids.map(id=>({id,dir:dirOf(),first:true,attempts:0})),total:ids.length,t0:Date.now(),phase:'ask',hint:0,earned:0,rightFirst:0,packs:0,fb:null,last:null,listening:false,speechMsg:''};
@@ -1195,6 +1249,8 @@ document.addEventListener('click',async e=>{
     case 'mode':S.mode=d.m==='speak'?'speak':'write';save();render();break;
     case 'start':startQuiz();break;
     case 'quit':stopListen();ui.view='home';render();break;
+    case 'unlock':if(!S.pinHash){endPause();}else{ui.lockPin=true;ui.lockErr='';renderLock();}break;
+    case 'unlock-go':if(hashPin(val('#lpin'))===S.pinHash){endPause();}else{ui.lockErr='Falsche PIN.';renderLock();}break;
     case 'size':if(L){L.sessionSize=[10,20,30].includes(+d.n)?+d.n:10;save();render();}break;
     case 'sm':ui.sm=d.v;render();break;
     case 'sg':ui.sg=d.v;render();break;
@@ -1371,6 +1427,7 @@ document.addEventListener('input',e=>{
   if(k==='vtext')ui.vtext=e.target.value;else if(k==='vunit')ui.vunit=e.target.value;
 });
 document.addEventListener('keydown',e=>{
+  if(S.pomo&&S.pomo.lock){if(e.key==='Enter'){const b=document.querySelector('[data-a="unlock-go"]');if(b)b.click();}return;}
   if(e.key!=='Enter')return;
   if(ui.view==='quiz'&&Q){
     if(Q.phase==='ask'&&Q.mode==='write'){e.preventDefault();const b=document.querySelector('[data-a="check"]');if(b)b.click();}
@@ -1384,7 +1441,8 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredIns
 (async function init(){
   try{db=await idbOpen();const all=await idbAll();for(const id of Object.keys(all)){BLOBS[id]=all[id];IMG[id]=URL.createObjectURL(all[id]);}}catch(e){db=null;}
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
-  save();render();
+  try{const hb=+(localStorage.getItem(POMO_HB)||0);if(S.pomo&&!S.pomo.lock&&S.pomo.idle==null&&hb)S.pomo.idle=hb;}catch(e){}
+  pomoTick();save();render();setInterval(pomoTick,1000);
   if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
