@@ -58,6 +58,8 @@ button:focus-visible,.in:focus-visible,.chip:focus-visible{outline:3px solid var
 .seg3{grid-template-columns:1fr 1fr 1fr}
 .startbar{position:fixed;left:0;right:0;bottom:calc(68px + env(safe-area-inset-bottom));z-index:4;padding:18px max(16px,calc((100vw - 528px)/2)) 6px;background:linear-gradient(transparent,var(--bg) 40%)}
 .btn.streakon{box-shadow:0 0 0 4px var(--streak),0 0 18px 3px var(--streak)}
+.stat.streakon{box-shadow:0 0 0 3px var(--streak),0 0 14px 2px var(--streak)}
+.stat.streakon b{color:var(--streak)}
 .flame{color:var(--streak);display:inline-flex;filter:drop-shadow(0 0 4px var(--streak))}
 .panel.streak{border:2px solid var(--streak)}
 .seg button{appearance:none;border:2px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:10px 8px;font:inherit;font-weight:800;font-size:16px;min-height:56px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
@@ -696,7 +698,7 @@ function vStats(){
     <div class="stat"><b>${dueN}</b><span>heute dran</span></div>
     <div class="stat"><b>${quote}</b><span>richtig</span></div>
     <div class="stat"><b>${have}/${L.cards.length}</b><span>Karten</span></div>
-    <div class="stat"><b>${stt}</b><span>Serie (Rekord ${best})</span></div>
+    <div class="stat ${stt>0?'streakon':''}"><b>${stt}</b><span>Serie (Rekord ${best})</span></div>
   </div>
   ${periodPanel('Diese Woche <span class="muted sm">Mo–So</span>',wk)}
   ${periodPanel('Dieser Monat <span class="muted sm">'+MONTHS[now.getMonth()]+'</span>',mo)}
