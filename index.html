@@ -158,6 +158,9 @@ nav button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width
 .bk{appearance:none;flex:0 0 62%;scroll-snap-align:center;border:3px solid var(--line);background:var(--surface);color:var(--ink);border-radius:18px;padding:8px;font:inherit;font-weight:800;font-size:15px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px}
 .bk img{width:100%;aspect-ratio:360/504;object-fit:cover;border-radius:12px;display:block}
 .bk.on{border-color:var(--accent);background:var(--accent-soft)}
+.cb{width:24px;height:24px;border:2px solid var(--line);border-radius:7px;flex:none;display:inline-grid;place-items:center;font-size:15px;font-weight:900;color:var(--accent-ink)}
+.cb.on{background:var(--accent);border-color:var(--accent)}
+.catdrop{margin:10px 0}
 .dot{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);flex:none;display:inline-block}
 nav button.on{color:var(--accent-text,var(--accent));background:var(--accent-soft)}
 /* Eltern */
@@ -261,7 +264,8 @@ function applyFirstTry(w,kind,hinted,now){
 }
 function pickSession(vocab,unit,size,now,rnd){
   rnd=rnd||Math.random;
-  const pool=vocab.filter(w=>!unit||w.unit===unit);
+  const sel=Array.isArray(unit)?unit:(unit?[unit]:[]);
+  const pool=vocab.filter(w=>!sel.length||sel.includes(w.unit));
   const sc=w=>(6-w.box)*10+Math.min(w.wrong||0,5)*2+((w.seen||0)===0?4:0)+rnd()*8;
   const due=pool.filter(w=>w.due<=now).map(w=>({w,s:sc(w)})).sort((a,b)=>b.s-a.s).map(o=>o.w);
   let pick=due.slice(0,size);
@@ -557,7 +561,7 @@ function starterBlob(emoji,color){
 }
 
 /* ================= Zustand der Oberfläche ================= */
-const ui={view:'home',unit:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:'',ls:{col:'f',dir:1},cats:false};
+const ui={view:'home',unit:[],catOpen:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
 let Q=null,deferredInstall=null,confirmT,rec=null;
 
 /* ================= Ansichten ================= */
@@ -567,13 +571,19 @@ function langChips(){
 }
 function streakNow(){const s=S.streak;if(!s||!s.last)return 0;return (s.last===dateKey(0)||s.last===dateKey(-1))?s.count:0;}
 
+function catDrop(key,sel,units,allLabel){
+  const open=ui.catOpen===key,cb=on=>`<span class="cb ${on?'on':''}">${on?'✓':''}</span>`;
+  const label=!sel.length?allLabel:sel.length<=2?sel.join(', '):sel.length+' Kategorien';
+  return `<div class="catdrop"><button class="themesel" data-a="cat-open" data-k="${key}" aria-expanded="${open}"><span class="grow">${esc(label)}</span><span>${open?'▲':'▼'}</span></button>
+  ${open?`<div class="themelist"><button class="theme ${!sel.length?'on':''}" data-a="cat-pick" data-k="${key}" data-u="">${cb(!sel.length)}${allLabel}</button>${units.map(u=>`<button class="theme ${sel.includes(u)?'on':''}" data-a="cat-pick" data-k="${key}" data-u="${esc(u)}">${cb(sel.includes(u))}${esc(u)}</button>`).join('')}</div>`:''}</div>`;
+}
 function vHome(){
   const L=curLang();
   if(!L) return `<div class="panel center"><h2>Willkommen!</h2><p class="muted">Lege im Elternbereich eine Sprache an.</p><button class="btn primary" data-a="nav" data-v="parent">Zum Elternbereich</button></div>`;
   const now=Date.now(),total=L.vocab.length;
   const dueN=L.vocab.filter(w=>w.due<=now).length,known=L.vocab.filter(w=>w.box>=4).length;
-  const units=unitsOf(L);if(ui.unit&&!units.includes(ui.unit))ui.unit='';
-  const pool=ui.unit?L.vocab.filter(w=>w.unit===ui.unit).length:total;
+  const units=unitsOf(L);ui.unit=ui.unit.filter(u=>units.includes(u));
+  const pool=ui.unit.length?L.vocab.filter(w=>ui.unit.includes(w.unit)).length:total;
   const n=Math.min(L.sessionSize,pool);
   const pct=Math.min(100,Math.round(L.points/L.goal*100));
   const st=streakNow(),nextT=(S.streakCfg.def.active||S.streakCfg.nextRid)?nextStreakTarget(st,S.streakCfg.days):0;
@@ -590,7 +600,7 @@ function vHome(){
     ${L.packs>0?`<button class="btn gold block" style="margin-top:12px" data-a="open-pack">Päckchen öffnen</button>`:''}
   </div>
   ${total?`
-  ${units.length>1?`<div class="chips"><button class="chip ${ui.unit===''?'on':''}" data-a="unit" data-u="">Alle Wörter</button>${units.map(u=>`<button class="chip ${ui.unit===u?'on':''}" data-a="unit" data-u="${esc(u)}">${esc(u)}</button>`).join('')}</div>`:''}
+  ${units.length>1?catDrop('home',ui.unit,units,'Alle Wörter'):''}
   <div class="seg" role="group" aria-label="Übungsart">
     <button class="${S.mode==='write'?'on':''}" data-a="mode" data-m="write">${ICON_PEN} Schreiben</button>
     <button class="${S.mode==='speak'?'on':''}" data-a="mode" data-m="speak">${ICON_MIC} Sprechen</button>
@@ -610,12 +620,12 @@ function vHome(){
 function vList(){
   const L=curLang();
   if(!L) return `<div class="panel center"><p>Noch keine Sprache angelegt.</p></div>`;
-  const units=unitsOf(L);if(ui.lf&&!units.includes(ui.lf))ui.lf='';
-  const ws=sortWords(L.vocab.filter(w=>!ui.lf||w.unit===ui.lf),ui.ls.col,ui.ls.dir);
+  const units=unitsOf(L);ui.lf=ui.lf.filter(u=>units.includes(u));
+  const ws=sortWords(L.vocab.filter(w=>!ui.lf.length||ui.lf.includes(w.unit)),ui.ls.col,ui.ls.dir);
   const ar=c=>ui.ls.col===c?(ui.ls.dir>0?' ▲':' ▼'):'';
   return `<div class="row"><button class="icon-btn" data-a="nav" data-v="home" aria-label="Zurück">←</button><h2 class="grow" style="margin:0">Vokabelliste</h2><span class="pill">${ws.length} Wörter</span></div>
   <div style="height:10px"></div>${langChips()}
-  ${units.length>1?`<div class="chips"><button class="chip ${ui.lf===''?'on':''}" data-a="list-filter" data-u="">Alle Kategorien</button>${units.map(u=>`<button class="chip ${ui.lf===u?'on':''}" data-a="list-filter" data-u="${esc(u)}">${esc(u)}</button>`).join('')}</div>`:''}
+  ${units.length>1?catDrop('list',ui.lf,units,'Alle Kategorien'):''}
   <div class="panel lt">
     <div class="lrow lhead"><button data-a="list-sort" data-c="f">${esc(L.name)}${ar('f')}</button><button data-a="list-sort" data-c="d">Deutsch${ar('d')}</button><button data-a="list-sort" data-c="u">Kategorie${ar('u')}</button></div>
     ${ws.length?ws.map(w=>`<div class="lrow"><b>${esc(w.f)}</b><span>${esc(w.d)}</span><span class="muted sm">${esc(w.unit)}</span></div>`).join(''):'<div class="lrow"><span class="muted">Keine Wörter.</span></div>'}
@@ -1081,14 +1091,14 @@ document.addEventListener('click',async e=>{
   const d=el.dataset,L=curLang();
   switch(d.a){
     case 'nav':if(Q&&Q.listening)stopListen();if(ui.view==='parent'&&d.v!=='parent')ui.unlocked=false;ui.view=d.v;ui.modal=null;ui.pinErr='';render();break;
-    case 'lang':S.activeLang=d.id;ui.unit='';ui.lf='';save();render();break;
-    case 'unit':ui.unit=d.u;render();break;
+    case 'lang':S.activeLang=d.id;ui.unit=[];ui.lf=[];ui.catOpen='';save();render();break;
+    case 'cat-open':ui.catOpen=ui.catOpen===d.k?'':d.k;render();break;
+    case 'cat-pick':{const a=d.k==='home'?ui.unit:ui.lf;if(d.u==='')a.length=0;else{const i=a.indexOf(d.u);if(i<0)a.push(d.u);else a.splice(i,1);}render();break;}
     case 'mode':S.mode=d.m==='speak'?'speak':'write';save();render();break;
     case 'start':startQuiz();break;
     case 'quit':stopListen();ui.view='home';render();break;
     case 'show-list':ui.view='list';render();break;
     case 'list-sort':ui.ls=ui.ls.col===d.c?{col:d.c,dir:-ui.ls.dir}:{col:d.c,dir:1};render();break;
-    case 'list-filter':ui.lf=d.u;render();break;
     case 'check':{
       const v=val('#ans');
       if(!v.trim()){toast('Schreibe zuerst eine Antwort.');break;}
@@ -1175,7 +1185,7 @@ document.addEventListener('click',async e=>{
     case 'save-unit':{
       const nn=val('#ue-name').trim();if(!nn){toast('Der Name darf nicht leer sein.');break;}
       L.vocab.forEach(w=>{if(w.unit===d.u)w.unit=nn;});
-      if(ui.openUnit===d.u)ui.openUnit=nn;ui.unit='';ui.lf='';ui.modal=null;save();render();toast('Umbenannt');break;}
+      if(ui.openUnit===d.u)ui.openUnit=nn;ui.unit=[];ui.lf=[];ui.modal=null;save();render();toast('Umbenannt');break;}
     case 'del-unit':{
       if(!ask(d.key))break;
       const u=d.key.slice('del-unit:'.length);L.vocab=L.vocab.filter(w=>w.unit!==u);if(ui.openUnit===u)ui.openUnit='';save();render();break;}
