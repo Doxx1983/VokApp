@@ -21,7 +21,7 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 ## Funktionen (Stand)
 - Mehrere Sprachen, je eigene Vokabeln, Punkte, Päckchen, Album, Statistik. Sprachauswahl als Dropdown; im Elternbereich Umschalter „Alle Sprachen / Einzelne Sprache“ (Alle: Punkte & Abfrage gelten für alle).
 - Lernen: Schreiben/Sprechen (Web Speech), 10/20/30 Wörter, Kategorie-Mehrfachauswahl, falsche Wörter kommen öfter (Leitner), Tippfehler-Toleranz.
-- Belohnung: Punkte → Päckchen → Karten (Seltenheit Normal 62 %, Selten 26 %, Episch 10 %, Legendär 2 %); eigene Kartenbilder (Galerie/ZIP), Kartenrücken-Karussell, spezielle Text-Belohnungen.
+- Belohnung: Punkte → Päckchen → Karten (Seltenheit Normal 62 %, Selten 26 %, Episch 10 %, Legendär 2 %); eigene Kartenbilder (Galerie/ZIP), Kartenrücken-Karussell (pro Sprache `L.back`, Standard `S.cardBack`; eigene Rücken als `S.customBacks` + IndexedDB-Bild `back:<id>`, 360×504 zugeschnitten, im Backup enthalten), spezielle Text-Belohnungen.
 - Serie: Länge in Tagen; Standard-Belohnung (Päckchen ×n, Big-Pack 5 Karten, Mega-Pack 7, Epic-Pack 3 epische, Legend-Pack 1 legendäre, oder Spezielle Belohnung) und einmalige Belohnung für die nächste Serie (gleiche Auswahl). Serien-Highlight in Gelb/Orange je nach Theme.
 - Optionen: 18 Farbschemata (alphabetisch, dunkel + „hell“-Varianten), Kartenrücken.
 - Statistik: Kennzahlen, Woche (Mo–So)/Monat, Verlauf Punkte/Lernzeit (Tage/Wochen), Wissensstand, knifflige Wörter.

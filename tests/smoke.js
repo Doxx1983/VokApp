@@ -115,7 +115,11 @@ const test=`
  await click({a:'theme',k:'rot'});assert.equal(S.theme,'rot');assert(document.documentElement.style.props['--accent'].startsWith('hsl(4'));assert(!ui.themeOpen);
  await click({a:'theme',k:'lila'});assert.equal(document.documentElement.style.props['--bg'],'#13112a');
  await click({a:'theme',k:'schwarz'});assert.equal(document.documentElement.style.props['--bg'],'#0b0b0c');
- await click({a:'back',n:'4'});assert.equal(S.cardBack,4);assert(app().includes('✓ Feuer'));await click({a:'back-step',d:'-1'});assert.equal(S.cardBack,3);S.cardBack=10;await click({a:'back-step',d:'1'});assert.equal(S.cardBack,1,'umlaufend');
+ await click({a:'back',n:'4'});assert.equal(curLang().back,4);assert(app().includes('✓ Feuer'));await click({a:'back-step',d:'-1'});assert.equal(curLang().back,3);curLang().back=10;await click({a:'back-step',d:'1'});assert.equal(curLang().back,1,'umlaufend');
+ S.customBacks.push({id:'ctest',name:'Eigener Rücken 1'});await click({a:'back',n:'ctest'});assert.equal(curLang().back,'ctest');assert(app().includes('✓ Eigener Rücken 1'));
+ await click({a:'back-step',d:'1'});assert.equal(curLang().back,1,'umlaufend nach eigenen');
+ await click({a:'back',n:'ctest'});await click({a:'del-back',key:'del-back:ctest'});await click({a:'del-back',key:'del-back:ctest'});assert.equal(S.customBacks.length,0);assert(curLang().back==null,'Verweis entfernt');
+ const m=migrate(JSON.parse(JSON.stringify(S)));m.langs[0].back='gibtsnicht';assert(migrate(m).langs[0].back==null,'ungültiger Rücken entfernt');
  await click({a:'theme',k:'blau'});assert(document.documentElement.style.props['--bg'].startsWith('hsl(217'));
  await click({a:'nav',v:'parent'});stub('#pin').value='4711';await click({a:'pin-go'});
  // Serien-Belohnung

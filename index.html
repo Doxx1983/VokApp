@@ -503,6 +503,9 @@ function themeVars(k){
 }
 const themeHex=t=>{const [s,l]=accOf(t),g=t.gray?(t.light?.2:.32):1;return rgbHex(hsl2rgb(t.h,s*g,l));};
 const themeKey=n=>n.replace(/^Hell/,'').toLowerCase()+(n.startsWith('Hell')?'1':'0');
+const backOf=(L)=>{const v=L&&L.back!=null?L.back:S.cardBack;return (typeof v==='string'&&S.customBacks.some(b=>b.id===v))||(typeof v==='number'&&v>=1&&v<=BACKS.length)?v:S.cardBack;};
+const backSrc=v=>typeof v==='string'?(IMG['back:'+v]||'backs/1.svg'):'backs/'+v+'.svg';
+const backIds=()=>[...BACKS.map((_,i)=>i+1),...S.customBacks.map(b=>b.id)];
 const BACKS=['Sternenhimmel','Dschungel','Ozean','Feuer','Neon','Regenbogen','Kristalle','Weltraum','Pixel','Einhorn'];
 const THEMES=THEME_DEFS.map(t=>({k:t.k,n:t.n,hex:t.hex||themeHex(t)})).sort((a,b)=>themeKey(a.n).localeCompare(themeKey(b.n),'de'));
 /* ZIP lesen (gespeichert oder deflate), ohne Bibliothek */
@@ -545,6 +548,7 @@ function migrate(s){
   s.mode=s.mode==='speak'?'speak':'write';
   s.rewards=Array.isArray(s.rewards)?s.rewards:[];
   s.cardBack=Math.min(Math.max(Math.round(+s.cardBack)||1,1),BACKS.length);
+  s.customBacks=(Array.isArray(s.customBacks)?s.customBacks:[]).filter(b=>b&&typeof b.id==='string'&&b.id).map(b=>({id:b.id,name:String(b.name||'Eigener Rücken').slice(0,30)}));
   s.pomo=s.pomo&&typeof s.pomo==='object'&&+s.pomo.start?s.pomo:null;
   if(s.pomo&&s.pomo.lock&&!(+s.pomo.until>0))s.pomo.until=Date.now()+(+s.pomo.left>0?s.pomo.left*1000:300000);
   const pc=s.pomoCfg=s.pomoCfg||{};pc.work=Math.min(90,Math.max(1,Math.round(+pc.work)||25));pc.brk=Math.min(30,Math.max(1,Math.round(+pc.brk)||5));pc.idle=Math.min(30,Math.max(1,Math.round(+pc.idle)||5));
@@ -556,6 +560,7 @@ function migrate(s){
   c.nextRid=c.nextRid||'';c.nextPack=SPECIAL_PACKS[c.nextPack]?c.nextPack:'';if(c.nextPack)c.nextRid='';
   s.streak=s.streak||{last:null,count:0};
   s.langs.forEach(l=>{
+    if(typeof l.back==='string'){if(!s.customBacks.some(b=>b.id===l.back))delete l.back;}else if(l.back!=null){const n=Math.round(+l.back);if(n>=1&&n<=BACKS.length)l.back=n;else delete l.back;}
     l.log=l.log&&typeof l.log==='object'?l.log:{};l.wins=l.wins||[];l.owned=l.owned||{};l.cards=l.cards||[];l.vocab=l.vocab||[];
     l.speechLang=(!l.speechLang||l.speechLang==='auto'||l.speechLang===speechLangFor(l.name))?'auto':l.speechLang;
     l.goal=l.goal||100;l.ppr=l.ppr||10;l.packSize=l.packSize||3;l.sessionSize=Math.min(30,Math.max(10,Math.round((+l.sessionSize||10)/10)*10));l.dir=l.dir||'mix';
@@ -672,6 +677,16 @@ async function fileToBlob(file,maxSide){
     return await new Promise(res=>c.toBlob(res,'image/jpeg',0.86));
   }finally{URL.revokeObjectURL(url);}
 }
+async function backImageBlob(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('Bild nicht lesbar'));i.src=url;});
+    const W=360,H=504,c=document.createElement('canvas');c.width=W;c.height=H;
+    const sc=Math.max(W/img.naturalWidth,H/img.naturalHeight),w=img.naturalWidth*sc,h=img.naturalHeight*sc;
+    c.getContext('2d').drawImage(img,(W-w)/2,(H-h)/2,w,h);
+    return await new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('Bild nicht lesbar')),'image/jpeg',.88));
+  }finally{URL.revokeObjectURL(url);}
+}
 async function packImageBlob(file){
   const url=URL.createObjectURL(file);
   try{
@@ -749,7 +764,7 @@ const HELP={
     'Jede Sprache hat ihre eigene Statistik.']],
   options:['Optionen',[
     'Farbschema: Wähle in der Liste dein Lieblingsdesign.',
-    'Kartenrücken: Wische oder tippe auf ‹ ›, und tippe auf einen Rücken, um ihn zu wählen. So sehen Karten im Päckchen aus.',
+    'Kartenrücken: Wische oder tippe auf ‹ ›, und tippe auf einen Rücken, um ihn zu wählen. Er gilt für das Kartenset der gewählten Sprache. Mit „Eigenen Kartenrücken hinzufügen“ kannst du ein Bild aus deiner Galerie nehmen (es wird auf Kartenformat zugeschnitten).',
     'Einstellungen gelten für dieses Gerät.']],
   parent:['Elternbereich',[
     'Der Bereich ist mit einer PIN geschützt. „Sperren“ schließt ihn wieder.',
@@ -1008,7 +1023,7 @@ function vPack(){
   if(!P.opened) return `<h2 class="center">Dein ${esc(P.name||'Päckchen')}</h2><p class="center muted">Tippe aufs Päckchen, um es zu öffnen.</p>
   <button class="packbig" data-a="tear" aria-label="Päckchen öffnen">${packPic()}</button>`;
   return `<h2 class="center">Dein ${esc(P.name||'Päckchen')}</h2><p class="center muted" id="packhint">${all?'Das sind deine neuen Karten!':'Tippe auf die Karten zum Aufdecken.'}</p>
-  <div class="packgrid">${P.items.map((it,i)=>`<button class="flip ${it.on?'on':''} ${it.card.kind==='reward'||it.card.rarity==='e'||it.card.rarity==='l'?'hi':''}" data-a="flip" data-i="${i}" aria-label="Karte ${i+1}"><div class="flip-in"><div class="face back" style="background:url(backs/${S.cardBack}.svg) center/cover no-repeat"></div><div class="face front">${cardFace(it.card,it.isNew)}</div></div></button>`).join('')}</div>
+  <div class="packgrid">${P.items.map((it,i)=>`<button class="flip ${it.on?'on':''} ${it.card.kind==='reward'||it.card.rarity==='e'||it.card.rarity==='l'?'hi':''}" data-a="flip" data-i="${i}" aria-label="Karte ${i+1}"><div class="flip-in"><div class="face back" style="background:url(${backSrc(backOf(curLang()))}) center/cover no-repeat"></div><div class="face front">${cardFace(it.card,it.isNew)}</div></div></button>`).join('')}</div>
   <div id="packact">${packActions()}</div>`;
 }
 
@@ -1299,10 +1314,14 @@ function vOptions(){
   <button class="themesel" data-a="theme-toggle" aria-expanded="${!!ui.themeOpen}"><span class="dot" style="background:${cur.hex}"></span><span class="grow">${cur.n}</span><span>${ui.themeOpen?'▲':'▼'}</span></button>
   ${ui.themeOpen?`<div class="themelist">${THEMES.map(t=>`<button class="theme ${S.theme===t.k?'on':''}" data-a="theme" data-k="${t.k}"><span class="dot" style="background:${t.hex}"></span>${t.n}</button>`).join('')}</div>`:''}</div>
   <div class="panel"><h3>Kartenrücken</h3>
+  ${S.langs.length>1?`${langChips(true)}<p class="note" style="margin:0 0 8px">Gilt für das Kartenset: <b>${esc(curLang()?curLang().name:'')}</b></p>`:''}
   <div class="row" style="flex-wrap:nowrap"><button class="icon-btn" data-a="back-step" data-d="-1" aria-label="Zurück">‹</button>
-  <div class="carousel grow" id="carousel">${BACKS.map((n,i)=>`<button class="bk ${S.cardBack===i+1?'on':''}" data-a="back" data-n="${i+1}" aria-pressed="${S.cardBack===i+1}"><img src="backs/${i+1}.svg" alt="" loading="lazy"><span>${S.cardBack===i+1?'✓ ':''}${n}</span></button>`).join('')}</div>
+  <div class="carousel grow" id="carousel">${backIds().map(id=>{const on=backOf(curLang())===id,cb=S.customBacks.find(b=>b.id===id),nm=cb?cb.name:BACKS[id-1];return `<button class="bk ${on?'on':''}" data-a="back" data-n="${id}" aria-pressed="${on}"><img src="${backSrc(id)}" alt="" ${cb?'':'loading="lazy"'}><span>${on?'✓ ':''}${esc(nm)}</span></button>`;}).join('')}</div>
   <button class="icon-btn" data-a="back-step" data-d="1" aria-label="Weiter">›</button></div>
-  <p class="note center">Wische oder tippe auf ‹ ›. So sehen die Karten im Päckchen aus, bevor sie aufgedeckt werden.</p></div>`;
+  <p class="note center">Wische oder tippe auf ‹ ›. So sehen die Karten im Päckchen aus, bevor sie aufgedeckt werden.</p>
+  <label class="btn small block" for="backin">Eigenen Kartenrücken hinzufügen</label><input id="backin" type="file" accept="image/*" hidden data-change="backimg">
+  ${typeof backOf(curLang())==='string'?`<div style="margin-top:8px">${confBtn('del-back:'+backOf(curLang()),'Diesen eigenen Rücken löschen','block')}</div>`:''}
+  ${S.langs.length>1?`<div style="margin-top:8px"><button class="btn small block" data-a="back-all">Für alle Sprachen übernehmen</button></div>`:''}</div>`;
 }
 function confetti(n){try{
   if(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches)return;
@@ -1637,8 +1656,10 @@ document.addEventListener('click',async e=>{
       ui.vtext='';save();render();
       toast(n+' hinzugefügt'+(upd?`, ${upd} um Tags ergänzt`:'')+(dup?`, ${dup} schon vorhanden`:'')+(r.skipped?`, ${r.skipped} Zeile(n) übersprungen`:''));break;}
     case 'theme':S.theme=THEMES.some(t=>t.k===d.k)?d.k:'blau';ui.themeOpen=false;save();render();break;
-    case 'back':S.cardBack=clamp(d.n,1,BACKS.length);save();render();break;
-    case 'back-step':S.cardBack=((S.cardBack-1+(+d.d)+BACKS.length)%BACKS.length)+1;save();render();break;
+    case 'back':{const v=/^\d+$/.test(d.n)?clamp(d.n,1,BACKS.length):d.n;if(L){L.back=v;save();render();}break;}
+    case 'back-step':{if(!L)break;const ids=backIds(),i=ids.indexOf(backOf(L));L.back=ids[(i+(+d.d)+ids.length)%ids.length];save();render();break;}
+    case 'back-all':{const v=backOf(L);S.langs.forEach(x=>{x.back=v;});if(typeof v==='number')S.cardBack=v;save();render();toast('Für alle Sprachen übernommen');break;}
+    case 'del-back':{if(!ask(d.key))break;const id=d.key.split(':')[1];S.customBacks=S.customBacks.filter(b=>b.id!==id);S.langs.forEach(x=>{if(x.back===id)delete x.back;});await delImg('back:'+id);save();render();toast('Rücken gelöscht');break;}
     case 'theme-toggle':ui.themeOpen=!ui.themeOpen;render();break;
     case 'toggle-cats':ui.cats=!ui.cats;render();break;
     case 'open-unit':ui.openUnit=ui.openUnit===d.u?'':d.u;render();break;
@@ -1707,6 +1728,13 @@ document.addEventListener('change',async e=>{
     else if(key==='rid')c.def.rid=el.value;
     else if(key==='next'){const v=el.value;if(v.startsWith('pack:')){c.nextPack=SPECIAL_PACKS[v.slice(5)]?v.slice(5):'';c.nextRid='';}else{c.nextRid=v;c.nextPack='';}}
     save();render();
+  }
+  else if(k==='backimg'){
+    const f=el.files[0];el.value='';if(!f)return;
+    try{const b=await backImageBlob(f);const id='c'+Date.now().toString(36);
+      S.customBacks.push({id,name:'Eigener Rücken '+(S.customBacks.length+1)});await putImg('back:'+id,b);
+      if(L)L.back=id;save();toast('Kartenrücken gespeichert');}catch(err){toast('Das Bild konnte nicht gelesen werden.');}
+    render();
   }
   else if(k==='packimg'){
     const f=el.files[0];el.value='';if(!f)return;
