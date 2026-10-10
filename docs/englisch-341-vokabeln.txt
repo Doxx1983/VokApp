@@ -26,7 +26,8 @@ he = er
 she = sie
 we = wir
 they = sie
-# Familie 1
+how many = wie viele
+# Familie
 mother = Mutter
 father = Vater
 sister = Schwester
@@ -69,7 +70,9 @@ scared = ängstlich
 excited = aufgeregt
 sick = krank
 fine = gut / in Ordnung
-# Haustiere 1
+bored = gelangweilt
+proud = stolz
+# Haustiere
 dog = Hund
 cat = Katze
 mouse = Maus
@@ -78,7 +81,7 @@ bird = Vogel
 fish = Fisch
 hamster = Hamster
 guinea pig = Meerschweinchen
-# Tiere 1
+# Tiere
 horse = Pferd
 cow = Kuh
 pig = Schwein
@@ -97,6 +100,11 @@ spider = Spinne
 butterfly = Schmetterling
 dolphin = Delfin
 whale = Wal
+goat = Ziege
+turtle = Schildkröte
+wolf = Wolf
+fox = Fuchs
+shark = Hai
 # Farben
 red = rot
 blue = blau
@@ -109,6 +117,7 @@ black = schwarz
 white = weiß
 brown = braun
 grey = grau
+gold = gold
 # Zahlen
 one = eins
 two = zwei
@@ -124,6 +133,8 @@ eleven = elf
 twelve = zwölf
 twenty = zwanzig
 one hundred = hundert
+first = erste
+fifty = fünfzig
 # Essen & Trinken
 bread = Brot
 butter = Butter
@@ -145,7 +156,7 @@ meat = Fleisch
 breakfast = Frühstück
 lunch = Mittagessen
 dinner = Abendessen
-# Früchte 1
+# Früchte
 apple = Apfel
 banana = Banane
 orange (fruit) = Orange
@@ -166,7 +177,8 @@ carrot = Karotte
 cucumber = Gurke
 onion = Zwiebel
 salad = Salat
-# Kleidung 1
+corn = Mais
+# Kleidung
 shirt = Hemd / T-Shirt
 trousers = Hose
 jeans = Jeans
@@ -181,7 +193,7 @@ hat = Hut / Mütze
 scarf = Schal
 gloves = Handschuhe
 boots = Stiefel
-# Möbel 1
+# Möbel
 table = Tisch
 chair = Stuhl
 bed = Bett
@@ -201,7 +213,8 @@ living room = Wohnzimmer
 garden = Garten
 door = Tür
 window = Fenster
-# Schule 1
+television = Fernseher
+# Schule
 school = Schule
 teacher = Lehrer / Lehrerin
 classroom = Klassenzimmer
@@ -240,6 +253,7 @@ spring = Frühling
 summer = Sommer
 autumn = Herbst
 winter = Winter
+storm = Sturm
 # Tage & Monate
 Monday = Montag
 Tuesday = Dienstag
@@ -286,6 +300,10 @@ dance = tanzen / Tanz
 birthday = Geburtstag
 present = Geschenk
 party = Party
+doll = Puppe
+swimming = Schwimmen
+song = Lied
+film = Film
 # Natur
 tree = Baum
 flower = Blume
@@ -297,7 +315,9 @@ beach = Strand
 sky = Himmel
 moon = Mond
 star = Stern
-# Verben 1
+grass = Gras
+lake = See
+# Verben
 to be = sein
 to have = haben
 to go = gehen
@@ -342,3 +362,4 @@ beautiful = schön
 funny = lustig
 loud = laut
 clean = sauber
+quiet = leise
