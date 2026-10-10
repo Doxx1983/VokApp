@@ -635,7 +635,7 @@ function starterBlob(emoji,color){
 }
 
 /* ================= Zustand der Oberfläche ================= */
-const ui={view:'home',selMode:false,cardSel:[],setupErr:'',lockErr:'',lockPin:false,sm:'p',sg:'d',unit:[],catOpen:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
+const ui={view:'home',selMode:false,cardSel:[],setupErr:'',lockErr:'',lockPin:false,sm:'p',sg:'d',unit:[],catOpen:'',pscope:'one',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
 let Q=null,deferredInstall=null,confirmT,rec=null;
 
 /* ================= Hilfe ================= */
@@ -682,6 +682,7 @@ const HELP={
     'Einstellungen gelten für dieses Gerät.']],
   parent:['Elternbereich',[
     'Der Bereich ist mit einer PIN geschützt. „Sperren“ schließt ihn wieder.',
+    'Alle Sprachen / Einzelne Sprache: Bei „Alle Sprachen“ gelten Punkte & Abfrage für jede Sprache. Bei „Einzelne Sprache“ wählst du im Dropdown die Sprache und kannst deren Vokabeln, Karten und Belohnungen bearbeiten.',
     'Tippe auf einen Abschnitt, um ihn zu öffnen. Bei jedem Abschnitt gibt es eine eigene Hilfe.',
     'Einmal im Monat sollte unter „Sicherung & PIN“ eine Sicherung gespeichert werden.']],
   lang:['Sprachen',[
@@ -737,11 +738,16 @@ function helpModal(k){
 }
 
 /* ================= Ansichten ================= */
-function langChips(){
+function langChips(noHelp){
   if(!S.langs.length) return '';
   const open=ui.catOpen==='lang',cur=curLang();
-  return `<div class="catdrop"><div class="row" style="flex-wrap:nowrap"><button class="themesel grow" data-a="cat-open" data-k="lang" aria-expanded="${open}"><span class="grow">${esc(cur.name)}</span><span>${open?'▲':'▼'}</span></button>${helpBtn(ui.view)}</div>
+  return `<div class="catdrop"><div class="row" style="flex-wrap:nowrap"><button class="themesel grow" data-a="cat-open" data-k="lang" aria-expanded="${open}"><span class="grow">${esc(cur.name)}</span><span>${open?'▲':'▼'}</span></button>${noHelp?'':helpBtn(ui.view)}</div>
   ${open?`<div class="themelist">${S.langs.map(l=>`<button class="theme ${l.id===cur.id?'on':''}" data-a="lang" data-id="${l.id}">${esc(l.name)}</button>`).join('')}</div>`:''}</div>`;
+}
+function scopeBar(){
+  if(!S.langs.length)return '';
+  const one=ui.pscope!=='all';
+  return `<div class="seg" role="group" aria-label="Einstellungen für" style="margin:8px 0"><button class="${!one?'on':''}" data-a="pscope" data-v="all">Alle Sprachen</button><button class="${one?'on':''}" data-a="pscope" data-v="one">Einzelne Sprache</button></div>${one?langChips(true):''}`;
 }
 function langTabs(){
   if(!S.langs.length) return '';
@@ -960,12 +966,15 @@ function vParent(){
       <button class="btn primary block" data-a="pin-go">Entsperren</button></div>`;
   }
   const L=curLang();
-  let h=`<div class="row spread"><h2>Elternbereich</h2><span class="row" style="gap:8px">${helpBtn('parent')}<button class="btn small" data-a="lock">Sperren</button></span></div>${langTabs()}`;
+  let h=`<div class="row spread"><h2>Elternbereich</h2><span class="row" style="gap:8px">${helpBtn('parent')}<button class="btn small" data-a="lock">Sperren</button></span></div>${scopeBar()}`;
   if(L&&(L.cards.length||L.vocab.length)&&(!S.lastBackup||Date.now()-S.lastBackup>14*864e5))h+=`<div class="busy">Die letzte Sicherung ist ${S.lastBackup?'älter als 14 Tage':'noch nicht gemacht'}. Bitte unter „Sicherung &amp; PIN“ eine Sicherung speichern, damit Karten und Fortschritt nicht verloren gehen.</div>`;
   h+=secBtn('lang','Sprachen');if(ui.sec==='lang')h+=pLang();
+  if(ui.pscope==='all')h+=`<p class="note">Vokabeln, Karten und Spezielle Belohnungen gehören zu einer Sprache. Wähle dafür „Einzelne Sprache“.</p>`;
+  else{
   h+=secBtn('vocab','Vokabeln');if(ui.sec==='vocab')h+=L?pVocab(L):noLang();
   h+=secBtn('cards','Karten');if(ui.sec==='cards')h+=L?pCards(L):noLang();
   h+=secBtn('prizes','Spezielle Belohnungen');if(ui.sec==='prizes')h+=L?pPrizes(L):noLang();
+  }
   h+=secBtn('streak','Serien-Belohnung');if(ui.sec==='streak')h+=pStreak();
   h+=secBtn('pomo','Lernpause');if(ui.sec==='pomo')h+=pPomo();
   h+=secBtn('reward','Punkte &amp; Abfrage');if(ui.sec==='reward')h+=L?pReward(L):noLang();
@@ -1065,18 +1074,20 @@ function pStreak(){
   </div>`;
 }
 function pReward(L){
+  if(ui.pscope==='all')L=S.langs[0];
   const sl=[['auto','Automatisch (passend zur Sprache)'],['en-GB','Englisch (UK)'],['en-US','Englisch (US)'],['fr-FR','Französisch'],['es-ES','Spanisch'],['it-IT','Italienisch'],['tr-TR','Türkisch'],['pl-PL','Polnisch'],['ru-RU','Russisch'],['nl-NL','Niederländisch'],['pt-PT','Portugiesisch']];
-  return `<div class="secbody">
+  const all=ui.pscope==='all';
+  return `<div class="secbody">${all?'<p class="note">Gilt für alle Sprachen. Angezeigt werden die Werte der ersten Sprache.</p>':''}
   <div class="field"><label for="s-goal">Punkte pro Päckchen</label><input id="s-goal" class="in" type="number" inputmode="numeric" min="10" max="2000" value="${L.goal}" data-change="set" data-k="goal"></div>
   <div class="field"><label for="s-ppr">Punkte pro richtiger Antwort</label><input id="s-ppr" class="in" type="number" inputmode="numeric" min="1" max="100" value="${L.ppr}" data-change="set" data-k="ppr"></div>
   <div class="field"><label for="s-pack">Karten pro Päckchen</label><input id="s-pack" class="in" type="number" inputmode="numeric" min="1" max="9" value="${L.packSize}" data-change="set" data-k="packSize"></div>
   <div class="field"><label for="s-dir">Abfrage beim Schreiben</label><select id="s-dir" class="in" data-change="set" data-k="dir">
     <option value="mix" ${L.dir==='mix'?'selected':''}>Gemischt</option>
-    <option value="f2d" ${L.dir==='f2d'?'selected':''}>${esc(L.name)} → Deutsch</option>
-    <option value="d2f" ${L.dir==='d2f'?'selected':''}>Deutsch → ${esc(L.name)}</option></select></div>
-  <div class="field"><label for="s-sl">Spracherkennung beim Sprechen (automatisch: ${esc(resolveSpeechLang(L))})</label><select id="s-sl" class="in" data-change="set" data-k="speechLang">${sl.map(([v,t])=>`<option value="${v}" ${L.speechLang===v?'selected':''}>${t}</option>`).join('')}</select></div>
+    <option value="f2d" ${L.dir==='f2d'?'selected':''}>${all?'Fremdsprache':esc(L.name)} → Deutsch</option>
+    <option value="d2f" ${L.dir==='d2f'?'selected':''}>Deutsch → ${all?'Fremdsprache':esc(L.name)}</option></select></div>
+  ${all?'':`<div class="field"><label for="s-sl">Spracherkennung beim Sprechen (automatisch: ${esc(resolveSpeechLang(L))})</label><select id="s-sl" class="in" data-change="set" data-k="speechLang">${sl.map(([v,t])=>`<option value="${v}" ${L.speechLang===v?'selected':''}>${t}</option>`).join('')}</select></div>`}
   <p class="note">Beim Sprechen wird immer das deutsche Wort vorgegeben. Mit den Standardwerten sind 10 richtige Antworten ein Päckchen mit 3 Karten. Seltenheit: Normal 62 %, Selten 26 %, Episch 10 %, Legendär 2 %.</p>
-  <button class="btn block" data-a="gift">1 Päckchen schenken</button></div>`;
+  ${all?'':'<button class="btn block" data-a="gift">1 Päckchen schenken</button>'}</div>`;
 }
 function pBackup(){
   return `<div class="secbody">
@@ -1470,6 +1481,7 @@ document.addEventListener('click',async e=>{
       $('#packact').innerHTML=packActions();$('#packhint').textContent='Das sind deine neuen Karten!';break;}
     case 'view-card':ui.modal={t:'view',id:d.id};render();break;
     case 'edit-card':ui.modal={t:'edit',id:d.id};render();break;
+    case 'pscope':ui.pscope=d.v==='all'?'all':'one';ui.catOpen='';if(ui.pscope==='all'&&['vocab','cards','prizes'].includes(ui.sec))ui.sec='reward';render();break;
     case 'help':ui.modal={t:'help',k:d.k};render();break;
     case 'close-modal':ui.modal=null;ui.confirm=null;render();break;
     case 'backdrop':if(e.target===el){ui.modal=null;ui.confirm=null;render();}break;
@@ -1606,12 +1618,13 @@ document.addEventListener('change',async e=>{
   else if(k==='files'){const files=[...el.files];el.value='';await importFiles(files);}
   else if(k==='set'&&L){
     const key=el.dataset.k;
-    if(key==='goal')L.goal=clamp(el.value,10,2000);
-    else if(key==='ppr')L.ppr=clamp(el.value,1,100);
-    else if(key==='packSize')L.packSize=clamp(el.value,1,9);
-    else if(key==='dir')L.dir=el.value;
-    else if(key==='speechLang')L.speechLang=el.value;
-    while(L.points>=L.goal){L.points-=L.goal;L.packs++;}
+    for(const T of (ui.pscope==='all'&&key!=='speechLang'?S.langs:[L])){
+    if(key==='goal')T.goal=clamp(el.value,10,2000);
+    else if(key==='ppr')T.ppr=clamp(el.value,1,100);
+    else if(key==='packSize')T.packSize=clamp(el.value,1,9);
+    else if(key==='dir')T.dir=el.value;
+    else if(key==='speechLang')T.speechLang=el.value;
+    while(T.points>=T.goal){T.points-=T.goal;T.packs++;}}
     save();render();toast('Gespeichert');
   }else if(k==='import'){
     const f=el.files[0];el.value='';if(!f)return;
