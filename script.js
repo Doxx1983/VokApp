@@ -222,7 +222,7 @@ const THEME_DEFS=[
 function accOf(t){
   return t.light?[90,72]:[100,68];
 }
-function themeVars(k){
+function themeVarsRaw(k){
   const t=THEME_DEFS.find(x=>x.k===k);if(!t)return null;
   if(t.orig)return {'--bg':'#13112a','--surface':'#1e1b3d','--surface-2':'#2a2650','--ink':'#f0eeff','--muted':'#a5a2cc','--line':'#37326a','--accent':'#8c83ff','--accent-2':'#b3adff','--accent-dark':'#3d35b8','--accent-ink':'#13112a','--accent-text':'#8c83ff','--accent-soft':'#2e2a63','--good':'#4cd49b','--good-bg':'#12352a','--bad':'#ff8077','--bad-bg':'#401a1a','--warn':'#ffd36b','--warn-bg':'#3d3010','--shadow':'0 6px 18px rgba(0,0,0,.35)','--streak':'#ffd23f','color-scheme':'dark'};
   if(t.dark)return {'--bg':'#0b0b0c','--surface':'#1a1a1c','--surface-2':'#27272b','--ink':'#f2f2f2','--muted':'#a2a2aa','--line':'#36363c','--accent':'#f2f2f2','--accent-2':'#cfcfd6','--accent-dark':'#6b6b74','--accent-ink':'#0b0b0c','--accent-text':'#f2f2f2','--accent-soft':'#2d2d33','--good':'#4cd49b','--good-bg':'#12352a','--bad':'#ff8077','--bad-bg':'#401a1a','--warn':'#ffd36b','--warn-bg':'#3d3010','--shadow':'0 6px 18px rgba(0,0,0,.5)','--streak':'#ffd23f','color-scheme':'dark'};
@@ -234,6 +234,16 @@ function themeVars(k){
   const [bs,bl,s2s,s2l,ls,ll,ss,sl,ds,dl]=t.light?[60,98,60,95,45,91,80,94,70,42]:[100,95,90,90,70,84,100,89,95,28];
   const acc=hsl2rgb(H,as*g,al),ink=lum(acc)>.22?P(60,10):'#ffffff';
   return {'--bg':P(bs,bl),'--surface':'#ffffff','--surface-2':P(s2s,s2l),'--ink':P(t.light?50:64,t.light?14:15),'--muted':P(t.light?22:30,t.light?42:42),'--line':P(ls,ll),'--accent':P(as,al),'--accent-2':P(100,t.light?78:62,(H+346)%360),'--accent-dark':P(ds,dl),'--accent-ink':ink,'--accent-text':P(as,32),'--accent-soft':P(ss,sl),'--good':'#147a52','--good-bg':'#dcf4e8','--bad':'#c4352b','--bad-bg':'#fde4e1','--warn':'#7d5200','--warn-bg':'#fff0c4','--shadow':'0 1px 0 rgba(0,0,0,.05),0 6px 18px rgba(0,0,0,.08)','--streak':'#ff7a00','color-scheme':'light'};
+}
+const parseCol=c=>{c=String(c).trim();if(c[0]==='#'){const v=c.length===4?[...c.slice(1)].map(x=>x+x):c.slice(1).match(/../g);return v.map(x=>parseInt(x,16));}const m=c.match(/hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%/);return m?hsl2rgb(+m[1],+m[2],+m[3]):[128,128,128];};
+const contrastOf=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+/* Nebentext (--muted) bekommt mindestens 5,5:1 gegen Hintergrund und Flächen, indem er Richtung Textfarbe gemischt wird. */
+function themeVars(k){
+  const v=themeVarsRaw(k);if(!v)return v;
+  const bgs=['--bg','--surface','--surface-2'].map(n=>parseCol(v[n])),ink=parseCol(v['--ink']),m0=parseCol(v['--muted']);
+  const ok=c=>Math.min(...bgs.map(b=>contrastOf(c,b)))>=5.5;
+  let t=0,c=m0;while(!ok(c)&&t<1){t+=.05;c=m0.map((x,i)=>Math.round(x+(ink[i]-x)*t));}
+  v['--muted']=rgbHex(c);return v;
 }
 const themeHex=t=>{const [s,l]=accOf(t),g=t.gray?(t.light?.2:.32):1;return rgbHex(hsl2rgb(t.h,s*g,l));};
 const themeKey=n=>n.replace(/^Hell/,'').toLowerCase()+(n.startsWith('Hell')?'1':'0');
@@ -448,7 +458,7 @@ const HELP={
     'Sprache: Oben wählst du die Sprache im Auswahlfeld. Jede Sprache hat eigene Punkte, Karten und Päckchen.',
     'Päckchen: Sammle Punkte beim Lernen. Ist das Punkteziel erreicht, kannst du ein Päckchen öffnen und bekommst Karten für dein Album.',
     'Serie: Zeigt, an wie vielen Tagen hintereinander du gelernt hast. Bei aktiver Serie leuchtet der Start-Button. Erreichst du ein Serienziel, wartet eine Belohnung.',
-    'Tags: Wähle einen oder mehrere Tags (z. B. #Tiere) aus, oder lass dich über „Alle Wörter“ abfragen. Ein Wort kann mehrere Tags haben.',
+    'Kategorien: Wähle eine oder mehrere Kategorien aus, oder lass dich über „Alle Wörter“ abfragen. Ein Wort kann in mehreren Kategorien stehen.',
     'Schreiben / Sprechen: Beim Schreiben tippst du die Antwort, beim Sprechen sagst du sie laut (braucht Mikrofon).',
     '10 / 20 / 30: So viele Wörter hat eine Lerneinheit.',
     'Lernen starten: Beginnt die Runde. Falsche Wörter kommen öfter wieder, gewusste seltener.',
@@ -460,9 +470,9 @@ const HELP={
     'Richtige Antworten bringen Punkte für das nächste Päckchen.']],
   list:['Vokabeln',[
     'Hier siehst du alle Wörter der gewählten Sprache.',
-    'Tags: Mit dem Auswahlfeld filterst du die Liste. Du kannst mehrere Tags wählen, es erscheinen alle Wörter mit mindestens einem davon.',
+    'Kategorien: Mit dem Auswahlfeld filterst du die Liste. Du kannst mehrere Kategorien wählen, es erscheinen alle Wörter, die in mindestens einer davon stehen.',
     'Stand: Zeigt, wie gut du ein Wort kannst. Keine Balken = noch neu. Je mehr Balken, desto sicherer; grüne Balken heißen sicher gelernt. Falsche Antworten setzen den Stand zurück.',
-    'Sortieren: Tippe auf eine Spaltenüberschrift (auch „Stand“). Nochmal tippen dreht die Reihenfolge um.',
+    'Sortieren: Tippe auf eine Spaltenüberschrift (auch „Kategorie“ und „Stand“). Nochmal tippen dreht die Reihenfolge um.',
     'Die Liste dient zum Nachschlagen und Üben. Bearbeiten können nur die Eltern im Elternbereich.']],
   album:['Album',[
     'Hier siehst du alle Karten, die du in der ausgewählten Sprache schon gesammelt hast.',
@@ -566,7 +576,7 @@ function streakNow(){const s=S.streak;if(!s||!s.last)return 0;return (s.last===d
 
 function catDrop(key,sel,units,allLabel){
   const open=ui.catOpen===key,cb=on=>`<span class="cb ${on?'on':''}">${on?'✓':''}</span>`;
-  const label=!sel.length?allLabel:sel.length<=2?sel.join(', '):sel.length+' Tags';
+  const label=!sel.length?allLabel:sel.length<=2?sel.join(', '):sel.length+' Kategorien';
   return `<div class="catdrop"><button class="themesel" data-a="cat-open" data-k="${key}" aria-expanded="${open}"><span class="grow">${esc(label)}</span><span>${open?'▲':'▼'}</span></button>
   ${open?`<div class="themelist"><button class="theme ${!sel.length?'on':''}" data-a="cat-pick" data-k="${key}" data-u="">${cb(!sel.length)}${allLabel}</button>${units.map(u=>`<button class="theme ${sel.includes(u)?'on':''}" data-a="cat-pick" data-k="${key}" data-u="${esc(u)}">${cb(sel.includes(u))}${esc(u)}</button>`).join('')}</div>`:''}</div>`;
 }
@@ -669,10 +679,10 @@ function vList(){
   const ar=c=>ui.ls.col===c?(ui.ls.dir>0?' ▲':' ▼'):'';
   return `<div class="row"><h2 class="grow" style="margin:0">Vokabeln</h2><span class="pill">${ws.length} Wörter</span></div>
   <div style="height:10px"></div>${langChips()}
-  ${units.length>1?catDrop('list',ui.lf,units,'Alle Tags'):''}
+  ${units.length>1?catDrop('list',ui.lf,units,'Alle Kategorien'):''}
   <div class="panel lt">
-    <div class="lrow lhead"><button data-a="list-sort" data-c="f">${esc(L.name)}${ar('f')}</button><button data-a="list-sort" data-c="d">Deutsch${ar('d')}</button><button data-a="list-sort" data-c="u">Tags${ar('u')}</button><button data-a="list-sort" data-c="k">Stand${ar('k')}</button></div>
-    ${ws.length?ws.map(w=>`<div class="lrow"><b>${esc(w.f)}</b><span>${esc(w.d)}</span><span class="muted sm">${tagsOf(w).map(t=>'#'+esc(t)).join(' ')}</span>${lvl(w)}</div>`).join(''):'<div class="lrow"><span class="muted">Keine Wörter.</span></div>'}
+    <div class="lrow lhead"><button class="c-f" data-a="list-sort" data-c="f">${esc(L.name)}${ar('f')}</button><button class="c-d" data-a="list-sort" data-c="d">Deutsch${ar('d')}</button><button class="c-u" data-a="list-sort" data-c="u">Kategorie${ar('u')}</button><button class="c-s" data-a="list-sort" data-c="k">Stand${ar('k')}</button></div>
+    ${ws.length?ws.map(w=>`<div class="lrow"><b class="c-f">${esc(w.f)}</b><span class="c-d">${esc(w.d)}</span><span class="c-u muted sm">${tagsOf(w).map(esc).join(', ')}</span>${lvl(w).replace('class="lvl"','class="lvl c-s"')}</div>`).join(''):'<div class="lrow"><span class="muted">Keine Wörter.</span></div>'}
   </div>`;
 }
 
