@@ -508,6 +508,7 @@ const HELP={
     'Jede Sprache hat ihre eigene Statistik.']],
   options:['Optionen',[
     'Farbschema: Wähle in der Liste dein Lieblingsdesign.',
+    'Kartenrücken: Wische oder tippe auf ‹ ›, und tippe auf einen Rücken, um ihn zu wählen. Er gilt für das Kartenset der gewählten Sprache. Eigene Rücken fügen Mama oder Papa im Elternbereich hinzu.',
     'Einstellungen gelten für dieses Gerät.']],
   parent:['Elternbereich',[
     'Der Bereich ist mit einer PIN geschützt. „Sperren“ schließt ihn wieder.',
@@ -535,10 +536,9 @@ const HELP={
     'Markieren: Wähle mehrere Karten aus und lösche sie gesammelt.',
     'Karte antippen: Name, Seltenheit und Bild bearbeiten.']],
   backs:['Kartenrücken',[
-    'Auswahl: Tippe auf einen Rücken oder nutze ‹ ›. Er gilt für die Sprache, die oben gewählt ist, so kann jede Sprache ihr eigenes Kartenset-Design haben.',
-    'Eigener Rücken: „Eigenen Kartenrücken hinzufügen“ nimmt ein Bild aus der Galerie und schneidet es auf Kartenformat zu.',
-    'Für alle Sprachen übernehmen: Setzt den gewählten Rücken überall.',
-    'Eigene Rücken sind in der Sicherung enthalten.']],
+    'Eigenen Kartenrücken hinzufügen: Nimmt ein Bild aus der Galerie und schneidet es auf Kartenformat zu.',
+    'Löschen: Entfernt einen eigenen Rücken. Sprachen, die ihn nutzten, bekommen wieder den Standard.',
+    'Ausgewählt wird der Rücken in den Optionen, getrennt für jede Sprache. Eigene Rücken sind in der Sicherung enthalten.']],
   prizes:['Spezielle Belohnungen',[
     'Lege eigene Belohnungen als Text an, z. B. „Eis essen“.',
     'Sie können als Preise für Päckchen oder Serien verwendet werden.',
@@ -790,14 +790,9 @@ function vAlbum(){
 }
 
 function pBacks(L){
-  return `<p class="note" style="margin:0 0 8px">Gilt für das Kartenset: <b>${esc(L.name)}</b></p>
-  <div class="row" style="flex-wrap:nowrap"><button class="icon-btn" data-a="back-step" data-d="-1" aria-label="Zurück">‹</button>
-  <div class="carousel grow" id="carousel">${backIds().map(id=>{const on=backOf(curLang())===id,cb=S.customBacks.find(b=>b.id===id),nm=cb?cb.name:BACKS[id-1];return `<button class="bk ${on?'on':''}" data-a="back" data-n="${id}" aria-pressed="${on}"><img src="${backSrc(id)}" alt="" ${cb?'':'loading="lazy"'}><span>${on?'✓ ':''}${esc(nm)}</span></button>`;}).join('')}</div>
-  <button class="icon-btn" data-a="back-step" data-d="1" aria-label="Weiter">›</button></div>
-  <p class="note center">Wische oder tippe auf ‹ ›. So sehen die Karten im Päckchen aus, bevor sie aufgedeckt werden.</p>
+  return `<p class="note" style="margin:0 0 8px">Hier fügst du eigene Kartenrücken hinzu. Ausgewählt wird der Rücken in den Optionen, getrennt für jede Sprache.</p>
   <label class="btn small block" for="backin">Eigenen Kartenrücken hinzufügen</label><input id="backin" type="file" accept="image/*" hidden data-change="backimg">
-  ${typeof backOf(curLang())==='string'?`<div style="margin-top:8px">${confBtn('del-back:'+backOf(curLang()),'Diesen eigenen Rücken löschen','block')}</div>`:''}
-  ${S.langs.length>1?`<div style="margin-top:8px"><button class="btn small block" data-a="back-all">Für alle Sprachen übernehmen</button></div>`:''}`;
+  ${S.customBacks.length?`<div class="grid" style="margin-top:12px">${S.customBacks.map(b=>`<div style="text-align:center"><img src="${backSrc(b.id)}" alt="" style="width:100%;aspect-ratio:360/504;object-fit:cover;border-radius:12px;display:block"><div class="note" style="margin:4px 0">${esc(b.name)}</div>${confBtn('del-back:'+b.id,'Löschen','block')}</div>`).join('')}</div>`:'<p class="note">Noch keine eigenen Kartenrücken.</p>'}`;
 }
 function secBtn(k,t){return `<button class="sechead ${ui.sec===k?'on':''}" data-a="sec" data-k="${k}"><span class="grow">${t}</span><span class="hq" data-a="help" data-k="${k}" role="button" aria-label="Hilfe">?</span><span>${ui.sec===k?'−':'+'}</span></button>`;}
 function confBtn(key,label,cls,attrs){const on=ui.confirm===key;return `<button class="btn small ${on?'danger':cls||''}" ${attrs||''} data-a="${key.split(':')[0]}" data-key="${esc(key)}">${on?'Wirklich?':label}</button>`;}
@@ -1071,7 +1066,14 @@ function vOptions(){
   return `<h2>Optionen</h2>
   <div class="panel"><h3>Farbschema</h3>
   <button class="themesel" data-a="theme-toggle" aria-expanded="${!!ui.themeOpen}"><span class="dot" style="background:${cur.hex}"></span><span class="grow">${cur.n}</span><span>${ui.themeOpen?'▲':'▼'}</span></button>
-  ${ui.themeOpen?`<div class="themelist">${THEMES.map(t=>`<button class="theme ${S.theme===t.k?'on':''}" data-a="theme" data-k="${t.k}"><span class="dot" style="background:${t.hex}"></span>${t.n}</button>`).join('')}</div>`:''}</div>`;
+  ${ui.themeOpen?`<div class="themelist">${THEMES.map(t=>`<button class="theme ${S.theme===t.k?'on':''}" data-a="theme" data-k="${t.k}"><span class="dot" style="background:${t.hex}"></span>${t.n}</button>`).join('')}</div>`:''}</div>
+  <div class="panel"><h3>Kartenrücken</h3>
+  ${S.langs.length>1?`${langChips(true)}<p class="note" style="margin:0 0 8px">Gilt für das Kartenset: <b>${esc(curLang()?curLang().name:'')}</b></p>`:''}
+  <div class="row" style="flex-wrap:nowrap"><button class="icon-btn" data-a="back-step" data-d="-1" aria-label="Zurück">‹</button>
+  <div class="carousel grow" id="carousel">${backIds().map(id=>{const on=backOf(curLang())===id,cb=S.customBacks.find(b=>b.id===id),nm=cb?cb.name:BACKS[id-1];return `<button class="bk ${on?'on':''}" data-a="back" data-n="${id}" aria-pressed="${on}"><img src="${backSrc(id)}" alt="" ${cb?'':'loading="lazy"'}><span>${on?'✓ ':''}${esc(nm)}</span></button>`;}).join('')}</div>
+  <button class="icon-btn" data-a="back-step" data-d="1" aria-label="Weiter">›</button></div>
+  <p class="note center">Wische oder tippe auf ‹ ›. So sehen die Karten im Päckchen aus, bevor sie aufgedeckt werden. Eigene Rücken fügen Mama oder Papa im Elternbereich hinzu.</p>
+  ${S.langs.length>1?`<button class="btn small block" data-a="back-all">Für alle Sprachen übernehmen</button>`:''}</div>`;
 }
 function confetti(n){try{
   if(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches)return;
