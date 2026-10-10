@@ -121,7 +121,8 @@ textarea.in{resize:vertical;min-height:120px}
 .big{font-size:56px;font-weight:900;line-height:1}
 /* Vokabelliste */
 .lt{padding:0;overflow:hidden}
-.lrow{display:grid;grid-template-columns:1.1fr 1.1fr .8fr;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);align-items:center;overflow-wrap:anywhere}
+.lrow{display:grid;grid-template-columns:1.1fr 1.1fr .8fr 46px;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);align-items:center;overflow-wrap:anywhere}
+.lvl{display:flex;gap:2px;align-items:flex-end;height:16px}.lvl i{flex:1;background:var(--line);border-radius:2px;height:100%}.lvl i:nth-child(1){height:30%}.lvl i:nth-child(2){height:50%}.lvl i:nth-child(3){height:68%}.lvl i:nth-child(4){height:84%}.lvl i.on{background:var(--accent)}.lvl i.top{background:var(--good)}
 .lrow:last-child{border:0}
 .lhead{background:var(--accent-soft);position:sticky;top:env(safe-area-inset-top,0px);z-index:2}
 .lhead button{appearance:none;border:0;background:none;color:var(--ink);font:inherit;font-weight:900;font-size:14px;text-align:left;padding:6px 0;cursor:pointer;min-height:40px}
@@ -360,10 +361,11 @@ function hintText(a,h){
   return [...p].map(ch=>{if(ch===' ')return ' ';shown++;return shown<=h?ch:'_';}).join(' ');
 }
 /* Sortierung der Vokabelliste: col = 'f' (Fremdsprache), 'd' (Deutsch), 'u' (Kategorie) */
+function wLevel(w){return (w.seen>0)?Math.max(1,Math.min(5,w.box||1)):0;}
 function sortWords(list,col,dir){
   const cf=new Intl.Collator('en',{sensitivity:'base',numeric:true}),cd=new Intl.Collator('de',{sensitivity:'base',numeric:true});
   const fkey=w=>String(w.f).replace(/^to\s+/i,'');
-  const key=w=>col==='d'?w.d:col==='u'?w.unit:fkey(w);
+  const key=w=>col==='d'?w.d:col==='u'?w.unit:col==='k'?String(wLevel(w)):fkey(w);
   const c=col==='f'?cf:cd;
   return list.slice().sort((a,b)=>(c.compare(key(a),key(b))*dir)||cf.compare(fkey(a),fkey(b)));
 }
@@ -657,7 +659,8 @@ const HELP={
   list:['Vokabeln',[
     'Hier siehst du alle Wörter der gewählten Sprache.',
     'Kategorien: Mit dem Auswahlfeld filterst du die Liste (mehrere möglich).',
-    'Sortieren: Tippe auf eine Spaltenüberschrift. Nochmal tippen dreht die Reihenfolge um.',
+    'Stand: Zeigt, wie gut du ein Wort kannst. Keine Balken = noch neu. Je mehr Balken, desto sicherer; grüne Balken heißen sicher gelernt. Falsche Antworten setzen den Stand zurück.',
+    'Sortieren: Tippe auf eine Spaltenüberschrift (auch „Stand“). Nochmal tippen dreht die Reihenfolge um.',
     'Die Liste dient zum Nachschlagen und Üben. Bearbeiten können nur die Eltern im Elternbereich.']],
   album:['Album',[
     'Hier siehst du alle Karten, die du in der ausgewählten Sprache schon gesammelt hast.',
@@ -851,6 +854,7 @@ function vStats(){
     <div class="legend"><span><i style="background:var(--good)"></i>Sicher ${known}</span><span><i style="background:var(--accent)"></i>Lerne ich ${learn}</span><span><i style="background:var(--line)"></i>Neu ${fresh}</span></div></div>
   ${hard.length?`<div class="panel"><h3>Knifflige Wörter</h3>${hard.map(w=>`<div class="urow"><div class="t"><b>${esc(w.f)}</b><div class="note">${esc(w.d)}</div></div><span class="pill gold">${w.wrong}× falsch</span></div>`).join('')}</div>`:''}`;
 }
+function lvl(w){const n=wLevel(w),t=n===0?'Neu':['','Anfang','Übung','Gut','Sicher','Sehr sicher'][n];return `<span class="lvl" role="img" aria-label="${t}" title="${t}">${[1,2,3,4,5].map(i=>`<i class="${i<=n?'on':''}${n>=4&&i<=n?' top':''}"></i>`).join('')}</span>`;}
 function vList(){
   const L=curLang();
   if(!L) return `<div class="panel center"><p>Noch keine Sprache angelegt.</p></div>`;
@@ -861,8 +865,8 @@ function vList(){
   <div style="height:10px"></div>${langChips()}
   ${units.length>1?catDrop('list',ui.lf,units,'Alle Kategorien'):''}
   <div class="panel lt">
-    <div class="lrow lhead"><button data-a="list-sort" data-c="f">${esc(L.name)}${ar('f')}</button><button data-a="list-sort" data-c="d">Deutsch${ar('d')}</button><button data-a="list-sort" data-c="u">Kategorie${ar('u')}</button></div>
-    ${ws.length?ws.map(w=>`<div class="lrow"><b>${esc(w.f)}</b><span>${esc(w.d)}</span><span class="muted sm">${esc(w.unit)}</span></div>`).join(''):'<div class="lrow"><span class="muted">Keine Wörter.</span></div>'}
+    <div class="lrow lhead"><button data-a="list-sort" data-c="f">${esc(L.name)}${ar('f')}</button><button data-a="list-sort" data-c="d">Deutsch${ar('d')}</button><button data-a="list-sort" data-c="u">Kategorie${ar('u')}</button><button data-a="list-sort" data-c="k">Stand${ar('k')}</button></div>
+    ${ws.length?ws.map(w=>`<div class="lrow"><b>${esc(w.f)}</b><span>${esc(w.d)}</span><span class="muted sm">${esc(w.unit)}</span>${lvl(w)}</div>`).join(''):'<div class="lrow"><span class="muted">Keine Wörter.</span></div>'}
   </div>`;
 }
 
