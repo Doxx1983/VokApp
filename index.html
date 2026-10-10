@@ -673,7 +673,7 @@ const HELP={
     'Sprache: Oben wählst du die Sprache im Auswahlfeld. Jede Sprache hat eigene Punkte, Karten und Päckchen.',
     'Päckchen: Sammle Punkte beim Lernen. Ist das Punkteziel erreicht, kannst du ein Päckchen öffnen und bekommst Karten für dein Album.',
     'Serie: Zeigt, an wie vielen Tagen hintereinander du gelernt hast. Bei aktiver Serie leuchtet der Start-Button. Erreichst du ein Serienziel, wartet eine Belohnung.',
-    'Tags: Wähle einen oder mehrere Tags (z. B. #Tiere) aus, oder lass dich über „Alle Wörter“ abfragen. Ein Wort kann mehrere Tags haben.',
+    'Kategorien: Wähle eine oder mehrere Kategorien aus, oder lass dich über „Alle Wörter“ abfragen. Ein Wort kann in mehreren Kategorien stehen.',
     'Schreiben / Sprechen: Beim Schreiben tippst du die Antwort, beim Sprechen sagst du sie laut (braucht Mikrofon).',
     '10 / 20 / 30: So viele Wörter hat eine Lerneinheit.',
     'Lernen starten: Beginnt die Runde. Falsche Wörter kommen öfter wieder, gewusste seltener.',
@@ -685,9 +685,9 @@ const HELP={
     'Richtige Antworten bringen Punkte für das nächste Päckchen.']],
   list:['Vokabeln',[
     'Hier siehst du alle Wörter der gewählten Sprache.',
-    'Tags: Mit dem Auswahlfeld filterst du die Liste. Du kannst mehrere Tags wählen, es erscheinen alle Wörter mit mindestens einem davon.',
+    'Kategorien: Mit dem Auswahlfeld filterst du die Liste. Du kannst mehrere Kategorien wählen, es erscheinen alle Wörter, die in mindestens einer davon stehen.',
     'Stand: Zeigt, wie gut du ein Wort kannst. Keine Balken = noch neu. Je mehr Balken, desto sicherer; grüne Balken heißen sicher gelernt. Falsche Antworten setzen den Stand zurück.',
-    'Sortieren: Tippe auf eine Spaltenüberschrift (auch „Stand“). Nochmal tippen dreht die Reihenfolge um.',
+    'Sortieren: Tippe auf eine Spaltenüberschrift (auch „Kategorie“ und „Stand“). Nochmal tippen dreht die Reihenfolge um.',
     'Die Liste dient zum Nachschlagen und Üben. Bearbeiten können nur die Eltern im Elternbereich.']],
   album:['Album',[
     'Hier siehst du alle Karten, die du in der ausgewählten Sprache schon gesammelt hast.',
@@ -791,7 +791,7 @@ function streakNow(){const s=S.streak;if(!s||!s.last)return 0;return (s.last===d
 
 function catDrop(key,sel,units,allLabel){
   const open=ui.catOpen===key,cb=on=>`<span class="cb ${on?'on':''}">${on?'✓':''}</span>`;
-  const label=!sel.length?allLabel:sel.length<=2?sel.join(', '):sel.length+' Tags';
+  const label=!sel.length?allLabel:sel.length<=2?sel.join(', '):sel.length+' Kategorien';
   return `<div class="catdrop"><button class="themesel" data-a="cat-open" data-k="${key}" aria-expanded="${open}"><span class="grow">${esc(label)}</span><span>${open?'▲':'▼'}</span></button>
   ${open?`<div class="themelist"><button class="theme ${!sel.length?'on':''}" data-a="cat-pick" data-k="${key}" data-u="">${cb(!sel.length)}${allLabel}</button>${units.map(u=>`<button class="theme ${sel.includes(u)?'on':''}" data-a="cat-pick" data-k="${key}" data-u="${esc(u)}">${cb(sel.includes(u))}${esc(u)}</button>`).join('')}</div>`:''}</div>`;
 }
@@ -894,10 +894,10 @@ function vList(){
   const ar=c=>ui.ls.col===c?(ui.ls.dir>0?' ▲':' ▼'):'';
   return `<div class="row"><h2 class="grow" style="margin:0">Vokabeln</h2><span class="pill">${ws.length} Wörter</span></div>
   <div style="height:10px"></div>${langChips()}
-  ${units.length>1?catDrop('list',ui.lf,units,'Alle Tags'):''}
+  ${units.length>1?catDrop('list',ui.lf,units,'Alle Kategorien'):''}
   <div class="panel lt">
-    <div class="lrow lhead"><button data-a="list-sort" data-c="f">${esc(L.name)}${ar('f')}</button><button data-a="list-sort" data-c="d">Deutsch${ar('d')}</button><button data-a="list-sort" data-c="u">Tags${ar('u')}</button><button data-a="list-sort" data-c="k">Stand${ar('k')}</button></div>
-    ${ws.length?ws.map(w=>`<div class="lrow"><b>${esc(w.f)}</b><span>${esc(w.d)}</span><span class="muted sm">${tagsOf(w).map(t=>'#'+esc(t)).join(' ')}</span>${lvl(w)}</div>`).join(''):'<div class="lrow"><span class="muted">Keine Wörter.</span></div>'}
+    <div class="lrow lhead"><button data-a="list-sort" data-c="f">${esc(L.name)}${ar('f')}</button><button data-a="list-sort" data-c="d">Deutsch${ar('d')}</button><button data-a="list-sort" data-c="u">Kategorie${ar('u')}</button><button data-a="list-sort" data-c="k">Stand${ar('k')}</button></div>
+    ${ws.length?ws.map(w=>`<div class="lrow"><b>${esc(w.f)}</b><span>${esc(w.d)}</span><span class="muted sm">${tagsOf(w).map(esc).join(', ')}</span>${lvl(w)}</div>`).join(''):'<div class="lrow"><span class="muted">Keine Wörter.</span></div>'}
   </div>`;
 }
 

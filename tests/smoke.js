@@ -49,7 +49,7 @@ const test=`
  assert.equal(FakeSR.lastLang,'en-GB','Erkennung folgt der Sprache');
  await click({a:'quit'});
  // ---- Vokabelliste für das Kind
- await click({a:'nav',v:'home'});await click({a:'nav',v:'list'});assert.equal(ui.view,'list');assert(app().includes('Hund')&&app().includes('Tags'));
+ await click({a:'nav',v:'home'});await click({a:'nav',v:'list'});assert.equal(ui.view,'list');assert(app().includes('Hund')&&app().includes('Kategorie'));
  await click({a:'list-sort',c:'d'});assert.equal(ui.ls.col,'d');assert.equal(ui.ls.dir,1);await click({a:'list-sort',c:'d'});assert.equal(ui.ls.dir,-1);
  const a1=app();assert(a1.indexOf('Wasser')<a1.indexOf('Apfel'),'absteigend nach Deutsch');
  await click({a:'list-sort',c:'u'});assert.equal(ui.ls.col,'u');
