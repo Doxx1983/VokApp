@@ -824,6 +824,7 @@ function vAlbum(){
   const have=L.cards.filter(c=>L.owned[c.id]>0).length;
   const wins=L.wins.slice().reverse();
   return `${langChips()}<div class="row spread"><h2>Album</h2><span class="pill">${have} / ${L.cards.length} Karten</span></div>
+  ${missingImgs(L)?`<div class="panel"><p style="margin:0"><b>Bei ${missingImgs(L)} Karten fehlt das Bild.</b> Mama oder Papa können es im Elternbereich unter „Karten“ wiederherstellen.</p></div>`:''}
   ${wins.length?`<div class="panel"><h3>Meine Belohnungen</h3>${wins.map(w=>`<div class="urow"><div class="t"><b>${esc(w.text)}</b><div class="note">${fmtDate(w.ts)} · ${winLabel(w)}</div></div><span class="pill ${w.redeemed?'ok':'gold'}">${w.redeemed?'eingelöst':'offen'}</span></div>`).join('')}</div>`:''}
   ${L.cards.length?`<div class="grid" style="margin-top:12px">${L.cards.map((c,i)=>{const n=L.owned[c.id]||0;
     return n>0?`<button class="tile" data-a="view-card" data-id="${c.id}">${cardFace(c,false,n)}</button>`
@@ -849,6 +850,7 @@ function vParent(){
   }
   const L=curLang();
   let h=`<div class="row spread"><h2>Elternbereich</h2><button class="btn small" data-a="lock">Sperren</button></div>${langChips()}`;
+  if(L&&(L.cards.length||L.vocab.length)&&(!S.lastBackup||Date.now()-S.lastBackup>14*864e5))h+=`<div class="busy">Die letzte Sicherung ist ${S.lastBackup?'älter als 14 Tage':'noch nicht gemacht'}. Bitte unter „Sicherung &amp; PIN“ eine Sicherung speichern, damit Karten und Fortschritt nicht verloren gehen.</div>`;
   h+=secBtn('lang','Sprachen');if(ui.sec==='lang')h+=pLang();
   h+=secBtn('vocab','Vokabeln');if(ui.sec==='vocab')h+=L?pVocab(L):noLang();
   h+=secBtn('cards','Karten');if(ui.sec==='cards')h+=L?pCards(L):noLang();
@@ -879,9 +881,11 @@ function pVocab(L){
   ${L.vocab.length?`<div style="margin-top:14px">${confBtn('reset-learn:x','Lernstand zurücksetzen','')}</div><p class="note">Setzt nur den Lernfortschritt der Wörter zurück. Punkte und Karten bleiben.</p>`:''}
   </div>`;
 }
+const missingImgs=L=>L.cards.filter(c=>!IMG[c.id]).length;
 function pCards(L){
   const cnt=RARITIES.map(r=>`${r.label}: ${L.cards.filter(c=>c.rarity===r.k).length}`).join(' · ');
   return `<div class="secbody">
+  ${missingImgs(L)?`<div class="busy">Bei ${missingImgs(L)} Karten fehlt das Bild. Wähle die Bilder oder die ZIP-Datei einfach noch einmal aus: Bilder mit gleichem Namen werden den vorhandenen Karten wieder zugeordnet. Oder lade eine Sicherung.</div>`:''}
   <div class="field"><label for="imprar">Seltenheit der neuen Karten</label><select id="imprar" class="in" data-change="imprar">${rarOptions(ui.imprar)}</select></div>
   <label class="btn primary block" for="filein">Bilder aus der Galerie wählen</label>
   <input id="filein" type="file" accept="image/*" multiple hidden data-change="files">
@@ -961,6 +965,7 @@ function pReward(L){
 function pBackup(){
   return `<div class="secbody">
   ${deferredInstall?`<button class="btn primary block" data-a="install" style="margin-bottom:12px">App auf dem Handy installieren</button>`:''}
+  <p class="note" style="margin-top:0">Speicherschutz: <b>${ui.persisted?'aktiv ✓':'nicht aktiv'}</b>${ui.persisted?'':' – Wird die App wie eine normale App installiert („Zum Startbildschirm hinzufügen“), löscht der Browser ihre Daten nicht beim Aufräumen.'}<br>Letzte Sicherung: <b>${S.lastBackup?fmtDate(S.lastBackup):'noch nie'}</b></p>
   <button class="btn block" data-a="export">Sicherung speichern</button>
   <p class="note">Speichert alle Sprachen, Vokabeln, Fortschritt und Karten in einer Datei. Am besten ab und zu machen.</p>
   <label class="btn block" for="bkin">Sicherung laden</label><input id="bkin" type="file" accept=".json,application/json" hidden data-change="import">
@@ -1015,6 +1020,8 @@ function vModal(){
 let lastView=null;
 const THEME_PROPS=['--streak','--accent-text','--bg','--surface','--surface-2','--ink','--muted','--line','--accent','--accent-2','--accent-dark','--accent-ink','--accent-soft','--good','--good-bg','--bad','--bad-bg','--warn','--warn-bg','--shadow','color-scheme'];
 const POMO_HB='ws-pomo-hb';
+let popping=false;
+function pushHist(){try{history.pushState({v:ui.view},'');}catch(e){}}
 function renderLock(){
   const el=$('#lock'),p=S.pomo,setup=!S.pinHash,on=setup||!!(p&&p.lock),app=$('#app'),nav=document.querySelector('nav');
   if(app)app.inert=on;if(nav)nav.inert=on;
@@ -1110,7 +1117,7 @@ function render(){
   ['home','list','album','stats','options','parent'].forEach(k=>$('#n-'+k).classList.toggle('on',k===tab));
   if(ui.view==='options'){const b=document.querySelector('.bk.on');if(b&&b.scrollIntoView)b.scrollIntoView({inline:'center',block:'nearest'});}
   if(lastView==='quiz'&&ui.view!=='quiz'&&S.pomo&&!S.pomo.lock){S.pomo=pomoOnEnd(S.pomo,Date.now());save();}
-  if(lastView!==ui.view){window.scrollTo(0,0);lastView=ui.view;}
+  if(lastView!==ui.view){window.scrollTo(0,0);if(lastView!==null&&!popping)pushHist();lastView=ui.view;}
   if(ui.view==='quiz'){
     if(Q.phase==='ask'){const a=$('#ans');if(a)a.focus();}else if(Q.phase==='fb'){const b=$('#nextbtn');if(b)b.focus();}
   }
@@ -1217,7 +1224,7 @@ async function exportBackup(){
     const blob=new Blob([JSON.stringify({app:'woerter-sammler',v:1,state:S,images})],{type:'application/json'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='woerter-sammler-sicherung-'+dateKey(0)+'.json';
     document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
-    toast('Sicherung gespeichert');
+    S.lastBackup=Date.now();save();render();toast('Sicherung gespeichert');
   }catch(e){toast('Sicherung fehlgeschlagen');}
 }
 async function applyImport(){
@@ -1236,34 +1243,38 @@ function ask(key){
   if(ui.confirm!==key){ui.confirm=key;clearTimeout(confirmT);confirmT=setTimeout(()=>{ui.confirm=null;render();},4000);render();return false;}
   ui.confirm=null;clearTimeout(confirmT);return true;
 }
+const IMPSTAT={n:0,r:0};
+async function addOrRestore(L,fname,blob,rarity){
+  const nm=cleanCardName(fname),ex=L.cards.find(c=>c.name===nm&&!IMG[c.id]);
+  if(ex){await putImg(ex.id,blob);IMPSTAT.r++;return;}
+  const id=uid();await putImg(id,blob);L.cards.push({id,name:nm,rarity});IMPSTAT.n++;
+}
 async function importZip(f){
-  const L=curLang();let n=0;
+  const L=curLang();
   try{
-    const list=zipList(await f.arrayBuffer()).filter(en=>zipImage(en.name));
+    const list=zipList(await f.arrayBuffer()).filter(en=>zipImage(en.name));let i=0;
     for(const en of list){
-      setBusy(`Importiere ${n+1} von ${list.length} …`);
+      setBusy(`Importiere ${++i} von ${list.length} …`);
       try{
         const data=await zipData(en);
         const blob=await fileToBlob(new Blob([data],{type:zipImage(en.name)}));
-        const id=uid();await putImg(id,blob);
-        L.cards.push({id,name:cleanCardName(en.name.split('/').pop()),rarity:zipRarity(en.name,ui.imprar)});n++;
+        await addOrRestore(L,en.name.split('/').pop(),blob,zipRarity(en.name,ui.imprar));
       }catch(e){}
     }
-  }catch(e){setBusy('');toast('Die ZIP-Datei konnte nicht gelesen werden.');return;}
-  return n;
+  }catch(e){setBusy('');toast('Die ZIP-Datei konnte nicht gelesen werden.');return false;}
+  return true;
 }
 async function importFiles(files){
   const L=curLang();if(!L||!files.length)return;
   const zips=files.filter(f=>/\.zip$/i.test(f.name)),imgs=files.filter(f=>!/\.zip$/i.test(f.name));
-  let n=0;
-  for(const z of zips){const k=await importZip(z);if(k===undefined)return;n+=k;}
-  files=imgs;
+  IMPSTAT.n=0;IMPSTAT.r=0;
+  for(const z of zips){if(!(await importZip(z)))return;}
   let i=0;
-  for(const f of files){
-    setBusy(`Importiere ${++i} von ${files.length} …`);
-    try{const blob=await fileToBlob(f);const id=uid();await putImg(id,blob);L.cards.push({id,name:cleanCardName(f.name),rarity:ui.imprar});n++;}catch(e){}
+  for(const f of imgs){
+    setBusy(`Importiere ${++i} von ${imgs.length} …`);
+    try{await addOrRestore(L,f.name,await fileToBlob(f),ui.imprar);}catch(e){}
   }
-  save();setBusy('');toast(n+' Karten hinzugefügt');render();
+  save();setBusy('');toast(IMPSTAT.n+' Karten hinzugefügt'+(IMPSTAT.r?', '+IMPSTAT.r+' Bilder wiederhergestellt':''));render();
 }
 function setBusy(t){ui.busy=t;const b=$('#busy');if(b){b.textContent=t;b.hidden=!t;}}
 async function addStarter(){
@@ -1483,13 +1494,23 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save();else syncTime();});
 window.addEventListener('pagehide',()=>save());
+window.addEventListener('popstate',e=>{
+  if(!S.pinHash||(S.pomo&&S.pomo.lock)){pushHist();return;}
+  if(ui.modal||ui.catOpen||ui.themeOpen||ui.confirm){ui.modal=null;ui.catOpen='';ui.themeOpen=false;ui.confirm=null;pushHist();render();return;}
+  let v=(e.state&&e.state.v)||'home';
+  if(!({home:1,list:1,album:1,stats:1,options:1,parent:1})[v])v='home';
+  if(Q&&Q.listening)stopListen();
+  if(ui.view==='parent'&&v!=='parent')ui.unlocked=false;
+  popping=true;ui.view=v;ui.modal=null;ui.pinErr='';render();popping=false;
+});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;});
 
 /* ================= Start ================= */
 (async function init(){
   try{db=await idbOpen();const all=await idbAll();for(const id of Object.keys(all)){BLOBS[id]=all[id];IMG[id]=URL.createObjectURL(all[id]);}}catch(e){db=null;}
-  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
+  try{if(navigator.storage&&navigator.storage.persist){ui.persisted=await navigator.storage.persist();}}catch(e){}
   try{const hb=+(localStorage.getItem(POMO_HB)||0);if(S.pomo&&!S.pomo.lock&&S.pomo.idle==null&&hb)S.pomo.idle=hb;}catch(e){}
+  try{history.replaceState({v:'home'},'');}catch(e){}
   pomoTick();save();render();setInterval(pomoTick,1000);syncTime();
   if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
