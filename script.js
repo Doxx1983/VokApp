@@ -1047,6 +1047,17 @@ function vOptions(){
   <button class="icon-btn" data-a="back-step" data-d="1" aria-label="Weiter">›</button></div>
   <p class="note center">Wische oder tippe auf ‹ ›. So sehen die Karten im Päckchen aus, bevor sie aufgedeckt werden.</p></div>`;
 }
+function confetti(n){
+  if(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+  const cols=['var(--gold)','var(--accent)','var(--accent-2)','var(--streak)'];
+  for(let i=0;i<(n||28);i++){const e=document.createElement('i');e.className='conf';
+    e.style.background=cols[i%cols.length];
+    e.style.setProperty('--dx',(Math.random()*320-160)+'px');
+    e.style.setProperty('--dy',(Math.random()*260+60)+'px');
+    e.style.setProperty('--rot',(Math.random()*720-360)+'deg');
+    e.style.animationDelay=(Math.random()*.15)+'s';
+    document.body.appendChild(e);setTimeout(()=>e.remove(),1700);}
+}
 function render(){
   applyTheme();
   let h='';
@@ -1062,7 +1073,9 @@ function render(){
     default:h=vHome();
   }
   if(ui.view!=='summary'&&ui.view!=='pack'&&!h.includes('class="btn small helpb"'))h=`<div class="helprow">${helpBtn(ui.view)}</div>`+h;
-  $('#app').innerHTML=h+(ui.modal?vModal():'');
+  const appEl=$('#app');appEl.innerHTML=h+(ui.modal?vModal():'');
+  appEl.classList.toggle('vin',lastView!==ui.view);
+  if(lastView!==ui.view&&ui.view==='summary'&&Q&&(Q.packs||(Q.streakAwards&&Q.streakAwards.length)))setTimeout(()=>confetti(36),250);
   document.body.classList.toggle('immersive',ui.view==='quiz'||ui.view==='pack');
   const tab=({album:'album',parent:'parent',options:'options',stats:'stats',list:'list'})[ui.view]||'home';
   ['home','list','album','stats','options','parent'].forEach(k=>$('#n-'+k).classList.toggle('on',k===tab));
@@ -1292,11 +1305,11 @@ document.addEventListener('click',async e=>{
       const v=val('#ans');render();const a=$('#ans');if(a){a.value=v;a.focus();}break;}
     case 'next':nextQuestion();break;
     case 'open-pack':openPack();break;
-    case 'tear':ui.pack.opened=true;if(navigator.vibrate)navigator.vibrate(30);render();break;
+    case 'tear':{if(navigator.vibrate)navigator.vibrate(30);el.classList.add('tearing');setTimeout(()=>{ui.pack.opened=true;render();},matchMedia('(prefers-reduced-motion:reduce)').matches?0:420);break;}
     case 'flip':{
       const it=ui.pack.items[+d.i];if(it.on)break;
       it.on=true;el.classList.add('on');
-      if(it.card.kind==='reward'||it.card.rarity==='e'||it.card.rarity==='l'){if(navigator.vibrate)navigator.vibrate(40);}
+      if(it.card.kind==='reward'||it.card.rarity==='e'||it.card.rarity==='l'){if(navigator.vibrate)navigator.vibrate(40);confetti(22);}
       $('#packact').innerHTML=packActions();
       if(ui.pack.items.every(i=>i.on))$('#packhint').textContent='Das sind deine neuen Karten!';
       break;}
