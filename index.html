@@ -633,7 +633,7 @@ function newLang(name){
 function seed(){
   const L=newLang('Englisch');
   const ex=[['dog','Hund'],['cat','Katze'],['house','Haus'],['apple','Apfel'],['red','rot'],['school','Schule'],['book','Buch'],['friend','Freund'],['water','Wasser'],['to run','rennen']];
-  ex.forEach(([f,d])=>L.vocab.push({id:uid(),f,d,tags:['Beispiel (bitte löschen)'],box:1,due:0,seen:0,right:0,wrong:0}));
+  ex.forEach(([f,d])=>L.vocab.push({id:uid(),f,d,tags:['Beispiel'],box:1,due:0,seen:0,right:0,wrong:0}));
   return migrate({v:1,pinHash:null,mode:'write',rewards:[],streak:{last:null,count:0},activeLang:L.id,langs:[L]});
 }
 function load(){
@@ -935,6 +935,7 @@ function vList(){
   const ar=c=>ui.ls.col===c?(ui.ls.dir>0?' ▲':' ▼'):'';
   return `<div class="row"><h2 class="grow" style="margin:0">Vokabeln</h2><span class="pill">${ws.length} Wörter</span></div>
   <div style="height:10px"></div>${langChips()}
+  ${L.vocab.some(w=>tagsOf(w).includes('Beispiel'))?'<p class="note">Das sind nur Beispielwörter. Mama oder Papa können sie im Elternbereich löschen.</p>':''}
   ${units.length>1?catDrop('list',ui.lf,units,'Alle Kategorien'):''}
   <div class="panel lt">
     <div class="lrow lhead"><button class="c-f" data-a="list-sort" data-c="f">${esc(L.name)}${ar('f')}</button><button class="c-d" data-a="list-sort" data-c="d">Deutsch${ar('d')}</button><button class="c-u" data-a="list-sort" data-c="u">Kategorie${ar('u')}</button><button class="c-s" data-a="list-sort" data-c="k">Stand${ar('k')}</button></div>
@@ -1022,7 +1023,7 @@ function vAlbum(){
   ${L.cards.length?`<div class="grid" style="margin-top:12px">${L.cards.map((c,i)=>{const n=L.owned[c.id]||0;
     return n>0?`<button class="tile" data-a="view-card" data-id="${c.id}">${cardFace(c,false,n)}</button>`
     :`<div class="tcard unk"><b>?<br><small>#${String(i+1).padStart(2,'0')}</small></b></div>`;}).join('')}</div>`
-  :`<div class="panel center"><p>Hier ist noch nichts drin.</p><p class="muted">Mama oder Papa fügen im Elternbereich Karten hinzu.</p></div>`}`;
+  :`<div class="panel center"><p><b>Hier sammelst du bald Karten!</b></p><p class="muted">Lerne Vokabeln, sammle Punkte und öffne Päckchen. Mama oder Papa fügen die Karten im Elternbereich hinzu.</p></div>`}`;
 }
 
 function secBtn(k,t){return `<button class="sechead ${ui.sec===k?'on':''}" data-a="sec" data-k="${k}"><span class="grow">${t}</span><span class="hq" data-a="help" data-k="${k}" role="button" aria-label="Hilfe">?</span><span>${ui.sec===k?'−':'+'}</span></button>`;}
@@ -1236,7 +1237,7 @@ function renderLock(){
     const sig='s'+ui.setupErr;
     if(el.hidden||el.dataset.sig!==sig){
       el.hidden=false;el.dataset.sig=sig;
-      el.innerHTML=`<div class="lockbox" role="dialog" aria-labelledby="lt"><h1 id="lt">Willkommen!</h1><p class="muted">Eltern: Legt jetzt eine PIN fest (4 bis 8 Ziffern). Sie schützt den Elternbereich und die Lernpause.</p>
+      el.innerHTML=`<div class="lockbox" role="dialog" aria-labelledby="lt"><h1 id="lt">Willkommen!</h1><p class="muted">Eltern: Legt jetzt eine PIN fest (4 bis 8 Ziffern). Sie schützt den Elternbereich und die Lernpause.</p><p class="note">Kind? Bitte hol Mama oder Papa. Danach kannst du gleich loslegen!</p>
       <div class="field"><input id="fp1" class="in ans" type="password" inputmode="numeric" maxlength="8" autocomplete="off" aria-label="PIN" placeholder="PIN"></div>
       <div class="field"><input id="fp2" class="in ans" type="password" inputmode="numeric" maxlength="8" autocomplete="off" aria-label="PIN wiederholen" placeholder="PIN wiederholen"></div>
       ${ui.setupErr?`<p class="err">${ui.setupErr}</p>`:''}<button class="btn primary block" data-a="pin-first">PIN festlegen</button></div>`;
@@ -1535,8 +1536,8 @@ document.addEventListener('click',async e=>{
     case 'unlock':if(!S.pinHash){endPause();}else{ui.lockPin=true;ui.lockErr='';renderLock();}break;
     case 'pin-first':{
       const a=val('#fp1'),b=val('#fp2');
-      if(!/^\d{4,8}$/.test(a))ui.setupErr='Die PIN braucht 4 bis 8 Ziffern.';
-      else if(a!==b)ui.setupErr='Die beiden PINs sind verschieden.';
+      if(!/^\d{4,8}$/.test(a))ui.setupErr=/\D/.test(a)?'Bitte nur Ziffern (0–9) in das erste Feld.':a.length<4?'Die PIN ist zu kurz: mindestens 4 Ziffern.':'Die PIN ist zu lang: höchstens 8 Ziffern.';
+      else if(a!==b)ui.setupErr='Das zweite Feld passt nicht zum ersten. Bitte die PIN genau wiederholen.';
       else{S.pinHash=hashPin(a);ui.setupErr='';save();render();}
       renderLock();break;}
     case 'unlock-go':if(hashPin(val('#lpin'))===S.pinHash){endPause();}else{ui.lockErr='Falsche PIN.';renderLock();}break;

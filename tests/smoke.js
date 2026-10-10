@@ -143,7 +143,7 @@ const test=`
  // PIN-Pflicht beim ersten Start
  {const pinOld=S.pinHash;S.pinHash=null;renderLock();assert.equal(stub('#lock').hidden,false);assert(stub('#lock').innerHTML.includes('Willkommen!')&&stub('#lock').innerHTML.includes('fp1'));assert.equal(stub('#app').inert,true);
   stub('#fp1').value='12';stub('#fp2').value='12';await click({a:'pin-first'});assert(!S.pinHash&&stub('#lock').innerHTML.includes('4 bis 8'));
-  stub('#fp1').value='1234';stub('#fp2').value='1235';await click({a:'pin-first'});assert(!S.pinHash&&stub('#lock').innerHTML.includes('verschieden'));
+  stub('#fp1').value='1234';stub('#fp2').value='1235';await click({a:'pin-first'});assert(!S.pinHash&&stub('#lock').innerHTML.includes('passt nicht'));
   stub('#fp1').value='1234';stub('#fp2').value='1234';await click({a:'pin-first'});assert.equal(S.pinHash,hashPin('1234'));assert.equal(stub('#lock').hidden,true);assert.equal(stub('#app').inert,false);S.pinHash=pinOld;}
  // Pomodoro-Sperre
  S.pinHash=hashPin('4711');S.pomo={start:Date.now()-26*60000,idle:null};timeReady=true;
