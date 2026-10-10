@@ -352,6 +352,15 @@ function parseVocab(text){
   }
   return {items,skipped};
 }
+/* Zeilen mit „# Name“ starten eine neue Kategorie; ohne Überschrift gilt die gewählte Kategorie. */
+function parseSections(text,def){
+  const out=[];let cur={unit:def,lines:[]};out.push(cur);
+  for(const raw of String(text).split(/\r?\n/)){
+    const m=raw.match(/^\s*#+\s*(.+?)\s*$/);
+    if(m){cur={unit:m[1].slice(0,40),lines:[]};out.push(cur);}else cur.lines.push(raw);
+  }
+  return out.map(c=>({unit:c.unit,...parseVocab(c.lines.join('\n'))})).filter(c=>c.items.length||c.skipped);
+}
 const cardKey=n=>String(n).toLowerCase().replace(/[^a-z0-9äöüß]/g,'');
 function cleanCardName(fn){
   const s=String(fn).replace(/\.[^.]+$/,'').replace(/[_\-+]+/g,' ').replace(/\s+/g,' ').trim();
@@ -702,7 +711,8 @@ const HELP={
     'Füge Wörter ein, eine Zeile pro Wort im Format „Fremdwort = Deutsch“.',
     'Kategorie: Wähle oder tippe eine Kategorie, damit Wörter gruppiert werden.',
     'Unten siehst du die Kategorien und Wörter. Tippe ein Wort an, um es zu bearbeiten oder zu löschen.',
-    'Mehrere Übersetzungen können mit Komma getrennt werden.']],
+    'Mehrere Kategorien auf einmal: Setze vor jede Gruppe eine Zeile „# Kategoriename“.',
+    'Mehrere richtige Antworten trennst du mit „/“.']],
   cards:['Karten',[
     'Bilder importieren: Aus der Galerie (mehrere auswählen) oder als ZIP-Datei mit vielen Bildern.',
     'Dateiname = Kartenname. Erneutes Importieren mit gleichem Namen ergänzt fehlende Bilder.',
@@ -1004,6 +1014,7 @@ function pVocab(L){
   return `<div class="secbody">
   <div class="field"><label for="vunit">Kategorie</label><input id="vunit" class="in" list="unitlist" data-input="vunit" value="${esc(ui.vunit)}" placeholder="z. B. Möbel" maxlength="40"><datalist id="unitlist">${units.map(u=>`<option value="${esc(u)}">`).join('')}</datalist></div>
   <div class="field"><label for="vtext">Vokabeln, eine pro Zeile: Fremdwort = Deutsch</label><textarea id="vtext" class="in" rows="7" data-input="vtext" placeholder="dog = Hund&#10;to run = rennen&#10;trousers = Hose / Hosen">${esc(ui.vtext)}</textarea></div>
+  <p class="note">Mehrere Kategorien auf einmal: Vor jede Gruppe eine Zeile „# Kategoriename“ setzen.</p>
   <p class="note">Mehrere richtige Antworten trennst du mit „/“. Text in Klammern ist optional, z. B. „(to) go“.</p>
   <button class="btn primary block" data-a="add-vocab">Hinzufügen</button>
   <button class="subhead" data-a="toggle-cats" aria-expanded="${ui.cats}"><span>Vorhandene Kategorien (${units.length})</span><span>${ui.cats?'−':'+'}</span></button>
@@ -1545,13 +1556,14 @@ document.addEventListener('click',async e=>{
       save();render();break;}
     case 'add-vocab':{
       if(!L)break;
-      const {items,skipped}=parseVocab(ui.vtext);
-      if(!items.length){toast('Keine Zeile mit „=“ gefunden.');break;}
-      const unit=(ui.vunit||'').trim()||'Allgemein';let n=0,dup=0;
-      for(const it of items){
-        if(L.vocab.some(w=>w.unit===unit&&w.f.toLowerCase()===it.f.toLowerCase()&&w.d.toLowerCase()===it.d.toLowerCase())){dup++;continue;}
-        L.vocab.push({id:uid(),f:it.f,d:it.d,unit,box:1,due:0,seen:0,right:0,wrong:0});n++;
-      }
+      const def=(ui.vunit||'').trim()||'Allgemein';
+      const secs=parseSections(ui.vtext,def);let skipped=0,n=0,dup=0,any=false;
+      for(const sec of secs){skipped+=sec.skipped;
+        for(const it of sec.items){any=true;
+          if(L.vocab.some(w=>w.unit===sec.unit&&w.f.toLowerCase()===it.f.toLowerCase()&&w.d.toLowerCase()===it.d.toLowerCase())){dup++;continue;}
+          L.vocab.push({id:uid(),f:it.f,d:it.d,unit:sec.unit,box:1,due:0,seen:0,right:0,wrong:0});n++;
+        }}
+      if(!any){toast('Keine Zeile mit „=“ gefunden.');break;}
       ui.vtext='';save();render();
       toast(n+' hinzugefügt'+(dup?`, ${dup} doppelt`:'')+(skipped?`, ${skipped} Zeile(n) übersprungen`:''));break;}
     case 'theme':S.theme=THEMES.some(t=>t.k===d.k)?d.k:'blau';ui.themeOpen=false;save();render();break;
