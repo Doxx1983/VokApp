@@ -1,4 +1,4 @@
-const V = 'woerter-sammler-v24';
+const V = 'woerter-sammler-v25';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', ...Array.from({length:10},(_,i)=>'./backs/'+(i+1)+'.svg')];
 
 self.addEventListener('install', e => {

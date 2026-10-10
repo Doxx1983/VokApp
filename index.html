@@ -640,7 +640,7 @@ let Q=null,deferredInstall=null,confirmT,rec=null;
 /* ================= Hilfe ================= */
 const HELP={
   home:['Lernen',[
-    'Sprache: Oben wählst du die Sprache. Jede Sprache hat eigene Punkte, Karten und Päckchen.',
+    'Sprache: Oben wählst du die Sprache im Auswahlfeld. Jede Sprache hat eigene Punkte, Karten und Päckchen.',
     'Päckchen: Sammle Punkte beim Lernen. Ist das Punkteziel erreicht, kannst du ein Päckchen öffnen und bekommst Karten für dein Album.',
     'Serie: Zeigt, an wie vielen Tagen hintereinander du gelernt hast. Bei aktiver Serie leuchtet der Start-Button. Erreichst du ein Serienziel, wartet eine Belohnung.',
     'Kategorien: Wähle eine oder mehrere Kategorien aus, oder lass „Alle Kategorien“ stehen.',
@@ -659,7 +659,7 @@ const HELP={
     'Sortieren: Tippe auf eine Spaltenüberschrift. Nochmal tippen dreht die Reihenfolge um.',
     'Die Liste dient zum Nachschlagen und Üben. Bearbeiten können nur die Eltern im Elternbereich.']],
   album:['Album',[
-    'Hier siehst du alle Karten der Sprache. Gesammelte Karten sind bunt, fehlende dunkel.',
+    'Hier siehst du alle Karten, die du in der ausgewählten Sprache schon gesammelt hast.',
     'Tippe auf eine Karte, um sie groß zu sehen.',
     'Oben steht, wie viele Karten du schon hast.',
     'Fehlen Bilder, können die Eltern sie im Elternbereich unter „Karten“ wiederherstellen.']],
@@ -732,7 +732,9 @@ function helpModal(k){
 /* ================= Ansichten ================= */
 function langChips(){
   if(!S.langs.length) return '';
-  return `<div class="chips" role="tablist">${S.langs.map(l=>`<button class="chip ${l.id===curLang().id?'on':''}" data-a="lang" data-id="${l.id}">${esc(l.name)}</button>`).join('')}</div>`;
+  const open=ui.catOpen==='lang',cur=curLang();
+  return `<div class="catdrop"><button class="themesel" data-a="cat-open" data-k="lang" aria-expanded="${open}"><span class="grow">${esc(cur.name)}</span><span>${open?'▲':'▼'}</span></button>
+  ${open?`<div class="themelist">${S.langs.map(l=>`<button class="theme ${l.id===cur.id?'on':''}" data-a="lang" data-id="${l.id}">${esc(l.name)}</button>`).join('')}</div>`:''}</div>`;
 }
 function streakNow(){const s=S.streak;if(!s||!s.last)return 0;return (s.last===dateKey(0)||s.last===dateKey(-1))?s.count:0;}
 
