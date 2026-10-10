@@ -100,6 +100,7 @@ textarea.in{resize:vertical;min-height:120px}
 .tog.on{background:var(--good-bg);color:var(--good)}
 /* Lernen */
 .qtop{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+.hq{width:28px;height:28px;border-radius:50%;background:var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:15px;margin:0 12px;flex:none}.sechead .grow{flex:1}
 .helprow{display:flex;justify-content:flex-end;margin:0 0 6px}.helprow.in{margin:6px 4px 0}.helpb{padding:4px 12px}.helplist{margin:8px 0 14px;padding-left:20px;line-height:1.45}.helplist li{margin:0 0 8px}
 .icon-btn{appearance:none;border:0;background:var(--surface);color:var(--ink);width:44px;height:44px;border-radius:12px;font-size:20px;font-weight:900;cursor:pointer;box-shadow:var(--shadow);flex:none}
 .qcard{background:var(--surface);border-radius:22px;padding:26px 18px;text-align:center;box-shadow:var(--shadow);margin-bottom:14px}
@@ -733,8 +734,12 @@ function helpModal(k){
 function langChips(){
   if(!S.langs.length) return '';
   const open=ui.catOpen==='lang',cur=curLang();
-  return `<div class="catdrop"><button class="themesel" data-a="cat-open" data-k="lang" aria-expanded="${open}"><span class="grow">${esc(cur.name)}</span><span>${open?'▲':'▼'}</span></button>
+  return `<div class="catdrop"><div class="row" style="flex-wrap:nowrap"><button class="themesel grow" data-a="cat-open" data-k="lang" aria-expanded="${open}"><span class="grow">${esc(cur.name)}</span><span>${open?'▲':'▼'}</span></button>${helpBtn(ui.view)}</div>
   ${open?`<div class="themelist">${S.langs.map(l=>`<button class="theme ${l.id===cur.id?'on':''}" data-a="lang" data-id="${l.id}">${esc(l.name)}</button>`).join('')}</div>`:''}</div>`;
+}
+function langTabs(){
+  if(!S.langs.length) return '';
+  return `<div class="chips" role="tablist">${S.langs.map(l=>`<button class="chip ${l.id===curLang().id?'on':''}" data-a="lang" data-id="${l.id}">${esc(l.name)}</button>`).join('')}</div>`;
 }
 function streakNow(){const s=S.streak;if(!s||!s.last)return 0;return (s.last===dateKey(0)||s.last===dateKey(-1))?s.count:0;}
 
@@ -932,7 +937,7 @@ function vAlbum(){
   :`<div class="panel center"><p>Hier ist noch nichts drin.</p><p class="muted">Mama oder Papa fügen im Elternbereich Karten hinzu.</p></div>`}`;
 }
 
-function secBtn(k,t){return `<button class="sechead ${ui.sec===k?'on':''}" data-a="sec" data-k="${k}"><span>${t}</span><span>${ui.sec===k?'−':'+'}</span></button>`;}
+function secBtn(k,t){return `<button class="sechead ${ui.sec===k?'on':''}" data-a="sec" data-k="${k}"><span class="grow">${t}</span><span class="hq" data-a="help" data-k="${k}" role="button" aria-label="Hilfe">?</span><span>${ui.sec===k?'−':'+'}</span></button>`;}
 function confBtn(key,label,cls,attrs){const on=ui.confirm===key;return `<button class="btn small ${on?'danger':cls||''}" ${attrs||''} data-a="${key.split(':')[0]}" data-key="${esc(key)}">${on?'Wirklich?':label}</button>`;}
 const rarOptions=sel=>RARITIES.map(r=>`<option value="${r.k}" ${sel===r.k?'selected':''}>${r.label}</option>`).join('');
 
@@ -949,16 +954,16 @@ function vParent(){
       <button class="btn primary block" data-a="pin-go">Entsperren</button></div>`;
   }
   const L=curLang();
-  let h=`<div class="row spread"><h2>Elternbereich</h2><button class="btn small" data-a="lock">Sperren</button></div>${langChips()}`;
+  let h=`<div class="row spread"><h2>Elternbereich</h2><span class="row" style="gap:8px">${helpBtn('parent')}<button class="btn small" data-a="lock">Sperren</button></span></div>${langTabs()}`;
   if(L&&(L.cards.length||L.vocab.length)&&(!S.lastBackup||Date.now()-S.lastBackup>14*864e5))h+=`<div class="busy">Die letzte Sicherung ist ${S.lastBackup?'älter als 14 Tage':'noch nicht gemacht'}. Bitte unter „Sicherung &amp; PIN“ eine Sicherung speichern, damit Karten und Fortschritt nicht verloren gehen.</div>`;
-  h+=secBtn('lang','Sprachen');if(ui.sec==='lang')h+=sh('lang')+pLang();
-  h+=secBtn('vocab','Vokabeln');if(ui.sec==='vocab')h+=sh('vocab')+(L?pVocab(L):noLang());
-  h+=secBtn('cards','Karten');if(ui.sec==='cards')h+=sh('cards')+(L?pCards(L):noLang());
-  h+=secBtn('prizes','Spezielle Belohnungen');if(ui.sec==='prizes')h+=sh('prizes')+(L?pPrizes(L):noLang());
-  h+=secBtn('streak','Serien-Belohnung');if(ui.sec==='streak')h+=sh('streak')+pStreak();
-  h+=secBtn('pomo','Lernpause');if(ui.sec==='pomo')h+=sh('pomo')+pPomo();
-  h+=secBtn('reward','Punkte &amp; Abfrage');if(ui.sec==='reward')h+=sh('reward')+(L?pReward(L):noLang());
-  h+=secBtn('backup','Sicherung &amp; PIN');if(ui.sec==='backup')h+=sh('backup')+pBackup();
+  h+=secBtn('lang','Sprachen');if(ui.sec==='lang')h+=pLang();
+  h+=secBtn('vocab','Vokabeln');if(ui.sec==='vocab')h+=L?pVocab(L):noLang();
+  h+=secBtn('cards','Karten');if(ui.sec==='cards')h+=L?pCards(L):noLang();
+  h+=secBtn('prizes','Spezielle Belohnungen');if(ui.sec==='prizes')h+=L?pPrizes(L):noLang();
+  h+=secBtn('streak','Serien-Belohnung');if(ui.sec==='streak')h+=pStreak();
+  h+=secBtn('pomo','Lernpause');if(ui.sec==='pomo')h+=pPomo();
+  h+=secBtn('reward','Punkte &amp; Abfrage');if(ui.sec==='reward')h+=L?pReward(L):noLang();
+  h+=secBtn('backup','Sicherung &amp; PIN');if(ui.sec==='backup')h+=pBackup();
   return h;
 }
 const sh=k=>`<div class="helprow in">${helpBtn(k)}</div>`;
@@ -1217,7 +1222,7 @@ function render(){
     case 'parent':h=vParent();break;
     default:h=vHome();
   }
-  if(ui.view!=='summary'&&ui.view!=='pack'&&!(ui.view==='parent'&&!ui.unlocked&&false))h=`<div class="helprow">${helpBtn(ui.view)}</div>`+h;
+  if(ui.view!=='summary'&&ui.view!=='pack'&&!h.includes('class="btn small helpb"'))h=`<div class="helprow">${helpBtn(ui.view)}</div>`+h;
   $('#app').innerHTML=h+(ui.modal?vModal():'');
   document.body.classList.toggle('immersive',ui.view==='quiz'||ui.view==='pack');
   const tab=({album:'album',parent:'parent',options:'options',stats:'stats',list:'list'})[ui.view]||'home';
