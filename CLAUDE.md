@@ -6,7 +6,7 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 ## Arbeitsweise
 - Antworten an Dominic: Deutsch, kurz und präzise.
 - Commit-Trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` und `Claude-Session: <Session-URL>`. Push: `git push -q origin main`.
-- Nach jeder Änderung: `sw.js` Cache-Version `woerter-sammler-vNN` erhöhen (aktuell v35), Tests laufen lassen, committen, pushen. Nutzer muss die App danach einmal neu laden.
+- Nach jeder Änderung: `sw.js` Cache-Version `woerter-sammler-vNN` erhöhen (aktuell v37), Tests laufen lassen, committen, pushen. Nutzer muss die App danach einmal neu laden.
 - Tests (Node, ohne Abhängigkeiten): `node tests/logic.test.js`, `tests/stats.test.js`, `tests/pomo.test.js`, `tests/smoke.js` (VM mit DOM-Stubs). `node --check` auf das extrahierte Script. Neue Features immer im Smoke-Test abdecken.
 - `pkill -f` nicht verwenden (beendet die eigene Shell).
 
@@ -34,9 +34,11 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 - Sync zwischen zwei Handys: nicht gebaut (bräuchte Cloud-Backend), „aktuell nicht“.
 - Karten-Pack-Bild (urheberrechtlich) ist nicht im Repo; wird vom Nutzer hochgeladen.
 
-## Vokabel-Kategorien
-Bestehende Kategorien des Nutzers (er benennt sie selbst um): Möbel, Früchte, Kleidung, Haustiere, Tiere, Schule, Verben, Familie; gewünscht zusätzlich Schulfächer.
-`docs/englisch-vokabeln.txt` (1039 Wörter, britisches Englisch, jede Kategorie mindestens 30 Wörter) nutzt diese Namen, damit die Wörter zusammengeführt werden. Verben sind thematisch auf die Kategorien verteilt (z. B. to eat → Essen & Trinken); „Verben“ enthält die allgemeinen Grundverben. Mehrdeutige Wörter stehen mit jeder Bedeutung (z. B. date = Dattel / Datum, shower = Dusche / Regenschauer).
-Kategorien: Begrüßung & Höflichkeit (40), Fragewörter & kleine Wörter (45), Familie (45), Körper (45), Gefühle (41), Haustiere (38), Tiere (45), Farben (42), Zahlen (45), Essen & Trinken (45), Früchte (43), Gemüse (37), Kleidung (45), Möbel (38), Zuhause (42), Schule (44), Schulfächer (43), Wetter & Jahreszeiten (45), Tage & Monate (45), Stadt & Verkehr (45), Spiel & Sport (45), Natur (44), Adjektive & Gegensätze (44), Verben (48).
-Idee des Nutzers (noch offen): Kategorien durch Tags/Hashtags ersetzen, sodass ein Wort mehrere Tags haben kann.
-Import: Elternbereich → Einzelne Sprache → Englisch → Vokabeln → gesamten Dateiinhalt einfügen → „Hinzufügen“. Identische Paare in derselben Kategorie werden übersprungen.
+## Vokabel-Tags (statt fester Kategorien)
+- Datenmodell: jedes Wort hat `tags: string[]` (früher `unit`; `migrate()` wandelt alte Daten um, ohne Tag → „Allgemein“). Helfer in der LOGIC: `normTag`, `splitTags`, `tagsOf`; Filter (Lernen, Vokabelliste) = Wort hat mindestens einen gewählten Tag.
+- Import: `Fremdwort = Deutsch #Tag1 #Tag2`; Zeile `# Tagname` setzt Tags für folgende Zeilen ohne eigene Tags; Feld „Tags für die neuen Wörter“ als Standard. Gleiches Paar (Fremdwort+Deutsch) wird nicht doppelt angelegt, sondern bekommt die Tags ergänzt.
+- Tag umbenennen (gleiche Namen werden zusammengelegt); Tag löschen entfernt den Tag und löscht Wörter, die nur diesen Tag hatten.
+- Bestehende Kategorien des Nutzers (jetzt Tags): Möbel, Früchte, Kleidung, Haustiere, Tiere, Schule, Verben, Familie; zusätzlich Schulfächer.
+- `docs/englisch-vokabeln.txt`: 1039 Wörter, britisches Englisch, mit Mehrfach-Tags (alle Verben zusätzlich #Verben), jeder Tag mindestens 30 Wörter. Mehrdeutige Wörter stehen mit jeder Bedeutung (date = Dattel / Datum).
+- Tags (Anzahl Wörter): Adjektive & Gegensätze (49), Begrüßung & Höflichkeit (40), Essen & Trinken (46), Familie (45), Farben (42), Fragewörter & kleine Wörter (45), Früchte (43), Gefühle (42), Gemüse (37), Haustiere (39), Kleidung (45), Körper (45), Möbel (38), Natur (47), Schule (45), Schulfächer (43), Spiel & Sport (47), Stadt & Verkehr (45), Tage & Monate (46), Tiere (45), Verben (137), Wetter & Jahreszeiten (46), Zahlen (45), Zuhause (43).
+- Import: Elternbereich → Einzelne Sprache → Englisch → Vokabeln → gesamten Dateiinhalt einfügen → „Hinzufügen“.

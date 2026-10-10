@@ -189,6 +189,7 @@ nav button.on{color:var(--accent-text,var(--accent));background:var(--accent-sof
 .sechead.on{border-radius:16px 16px 0 0;position:relative;z-index:1}
 .urow{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
 .urow.cat{flex-wrap:wrap}.urow.cat .t{flex:1 1 100%}.urow.cat>.btn{flex:1 1 0;padding-left:6px;padding-right:6px}
+.tagpick{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-height:120px;overflow-y:auto}.tagchip{appearance:none;border:2px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:3px 10px;font:inherit;font-size:14px;font-weight:700;cursor:pointer}.tagchip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .urow:last-child{border:0}
 .urow .t{flex:1;min-width:0;overflow-wrap:anywhere}
 .wrow{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:15px}
@@ -293,10 +294,13 @@ function applyFirstTry(w,kind,hinted,now){
   else if(kind==='right'||kind==='almost'){w.due=now;}
   else{w.wrong=(w.wrong||0)+1;w.box=1;w.due=now;}
 }
+function normTag(s){return String(s==null?'':s).replace(/^[#\s]+/,'').replace(/\s+/g,' ').trim().slice(0,40);}
+function splitTags(s){const out=[];for(const p of String(s==null?'':s).split(/#|,/)){const t=normTag(p);if(t&&!out.some(x=>x.toLowerCase()===t.toLowerCase()))out.push(t);}return out;}
+function tagsOf(w){return Array.isArray(w.tags)?w.tags:(w.unit?[w.unit]:[]);}
 function pickSession(vocab,unit,size,now,rnd){
   rnd=rnd||Math.random;
   const sel=Array.isArray(unit)?unit:(unit?[unit]:[]);
-  const pool=vocab.filter(w=>!sel.length||sel.includes(w.unit));
+  const pool=vocab.filter(w=>!sel.length||tagsOf(w).some(t=>sel.includes(t)));
   const sc=w=>(6-w.box)*10+Math.min(w.wrong||0,5)*2+((w.seen||0)===0?4:0)+rnd()*8;
   const due=pool.filter(w=>w.due<=now).map(w=>({w,s:sc(w)})).sort((a,b)=>b.s-a.s).map(o=>o.w);
   let pick=due.slice(0,size);
@@ -349,18 +353,23 @@ function parseVocab(text){
     if(!m){skipped++;continue;}
     const f=m[1].trim(),d=m[2].trim();
     if(!f||!d){skipped++;continue;}
-    items.push({f,d});
+    let dd=d,tags=[];const hi=d.search(/\s#/);
+    if(hi>=0){tags=splitTags(d.slice(hi));dd=d.slice(0,hi).trim();}
+    if(!dd){skipped++;continue;}
+    items.push({f,d:dd,tags});
   }
   return {items,skipped};
 }
-/* Zeilen mit „# Name“ starten eine neue Kategorie; ohne Überschrift gilt die gewählte Kategorie. */
+/* „# Name“ setzt Tags für die folgenden Zeilen; „#Tag“ am Zeilenende (Überschrift hat Vorrang nur ohne Zeilen-Tags). */
 function parseSections(text,def){
-  const out=[];let cur={unit:def,lines:[]};out.push(cur);
+  let cur=def&&def.length?def:['Allgemein'];const items=[];let skipped=0,buf=[];
+  const flush=()=>{const r=parseVocab(buf.join('\n'));skipped+=r.skipped;for(const it of r.items)items.push({f:it.f,d:it.d,tags:it.tags.length?it.tags:cur});buf=[];};
   for(const raw of String(text).split(/\r?\n/)){
     const m=raw.match(/^\s*#+\s*(.+?)\s*$/);
-    if(m){cur={unit:m[1].slice(0,40),lines:[]};out.push(cur);}else cur.lines.push(raw);
+    if(m){flush();const t=splitTags(m[1]);cur=t.length?t:cur;}else buf.push(raw);
   }
-  return out.map(c=>({unit:c.unit,...parseVocab(c.lines.join('\n'))})).filter(c=>c.items.length||c.skipped);
+  flush();
+  return {items,skipped};
 }
 const cardKey=n=>String(n).toLowerCase().replace(/[^a-z0-9äöüß]/g,'');
 function cleanCardName(fn){
@@ -381,7 +390,7 @@ function wLevel(w){return (w.seen>0)?Math.max(1,Math.min(5,w.box||1)):0;}
 function sortWords(list,col,dir){
   const cf=new Intl.Collator('en',{sensitivity:'base',numeric:true}),cd=new Intl.Collator('de',{sensitivity:'base',numeric:true});
   const fkey=w=>String(w.f).replace(/^to\s+/i,'');
-  const key=w=>col==='d'?w.d:col==='u'?w.unit:col==='k'?String(wLevel(w)):fkey(w);
+  const key=w=>col==='d'?w.d:col==='u'?tagsOf(w).join(' '):col==='k'?String(wLevel(w)):fkey(w);
   const c=col==='f'?cf:cd;
   return list.slice().sort((a,b)=>(c.compare(key(a),key(b))*dir)||cf.compare(fkey(a),fkey(b)));
 }
@@ -509,6 +518,7 @@ function migrate(s){
     l.log=l.log&&typeof l.log==='object'?l.log:{};l.wins=l.wins||[];l.owned=l.owned||{};l.cards=l.cards||[];l.vocab=l.vocab||[];
     l.speechLang=(!l.speechLang||l.speechLang==='auto'||l.speechLang===speechLangFor(l.name))?'auto':l.speechLang;
     l.goal=l.goal||100;l.ppr=l.ppr||10;l.packSize=l.packSize||3;l.sessionSize=Math.min(30,Math.max(10,Math.round((+l.sessionSize||10)/10)*10));l.dir=l.dir||'mix';
+    l.vocab.forEach(w=>{w.tags=splitTags(Array.isArray(w.tags)?w.tags.join('#'):(w.unit||''));if(!w.tags.length)w.tags=['Allgemein'];delete w.unit;});
     l.points=l.points||0;l.packs=l.packs||0;l.sp=(Array.isArray(l.sp)?l.sp:[]).filter(t=>SPECIAL_PACKS[t]);l.totalPoints=l.totalPoints||0;
   });
   if(!s.langs.find(l=>l.id===s.activeLang)) s.activeLang=s.langs[0]?s.langs[0].id:null;
@@ -582,7 +592,7 @@ function newLang(name){
 function seed(){
   const L=newLang('Englisch');
   const ex=[['dog','Hund'],['cat','Katze'],['house','Haus'],['apple','Apfel'],['red','rot'],['school','Schule'],['book','Buch'],['friend','Freund'],['water','Wasser'],['to run','rennen']];
-  ex.forEach(([f,d])=>L.vocab.push({id:uid(),f,d,unit:'Beispiel (bitte löschen)',box:1,due:0,seen:0,right:0,wrong:0}));
+  ex.forEach(([f,d])=>L.vocab.push({id:uid(),f,d,tags:['Beispiel (bitte löschen)'],box:1,due:0,seen:0,right:0,wrong:0}));
   return migrate({v:1,pinHash:null,mode:'write',rewards:[],streak:{last:null,count:0},activeLang:L.id,langs:[L]});
 }
 function load(){
@@ -592,7 +602,8 @@ function load(){
 let S=load();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Speichern nicht möglich');}}
 const curLang=()=>S.langs.find(l=>l.id===S.activeLang)||S.langs[0]||null;
-const unitsOf=L=>[...new Set(L.vocab.map(w=>w.unit))];
+const unitsOf=L=>[...new Set(L.vocab.flatMap(tagsOf))].sort(new Intl.Collator('de',{sensitivity:'base',numeric:true}).compare);
+const hasTag=(w,t)=>tagsOf(w).includes(t);
 const rewardsFor=L=>S.rewards.filter(r=>r.active&&(r.lang==='all'||r.lang===L.id));
 
 /* Bilder in IndexedDB */
@@ -662,7 +673,7 @@ const HELP={
     'Sprache: Oben wählst du die Sprache im Auswahlfeld. Jede Sprache hat eigene Punkte, Karten und Päckchen.',
     'Päckchen: Sammle Punkte beim Lernen. Ist das Punkteziel erreicht, kannst du ein Päckchen öffnen und bekommst Karten für dein Album.',
     'Serie: Zeigt, an wie vielen Tagen hintereinander du gelernt hast. Bei aktiver Serie leuchtet der Start-Button. Erreichst du ein Serienziel, wartet eine Belohnung.',
-    'Kategorien: Wähle eine oder mehrere Kategorien aus, oder lass dich über „Alle Kategorien“ abfragen.',
+    'Tags: Wähle einen oder mehrere Tags (z. B. #Tiere) aus, oder lass dich über „Alle Wörter“ abfragen. Ein Wort kann mehrere Tags haben.',
     'Schreiben / Sprechen: Beim Schreiben tippst du die Antwort, beim Sprechen sagst du sie laut (braucht Mikrofon).',
     '10 / 20 / 30: So viele Wörter hat eine Lerneinheit.',
     'Lernen starten: Beginnt die Runde. Falsche Wörter kommen öfter wieder, gewusste seltener.',
@@ -674,7 +685,7 @@ const HELP={
     'Richtige Antworten bringen Punkte für das nächste Päckchen.']],
   list:['Vokabeln',[
     'Hier siehst du alle Wörter der gewählten Sprache.',
-    'Kategorien: Mit dem Auswahlfeld filterst du die Liste (mehrere möglich).',
+    'Tags: Mit dem Auswahlfeld filterst du die Liste. Du kannst mehrere Tags wählen, es erscheinen alle Wörter mit mindestens einem davon.',
     'Stand: Zeigt, wie gut du ein Wort kannst. Keine Balken = noch neu. Je mehr Balken, desto sicherer; grüne Balken heißen sicher gelernt. Falsche Antworten setzen den Stand zurück.',
     'Sortieren: Tippe auf eine Spaltenüberschrift (auch „Stand“). Nochmal tippen dreht die Reihenfolge um.',
     'Die Liste dient zum Nachschlagen und Üben. Bearbeiten können nur die Eltern im Elternbereich.']],
@@ -710,9 +721,11 @@ const HELP={
     'Löschen entfernt die Sprache mit allen Daten. Dafür zweimal tippen.']],
   vocab:['Vokabeln (Eltern)',[
     'Füge Wörter ein, eine Zeile pro Wort im Format „Fremdwort = Deutsch“.',
-    'Kategorie: Wähle oder tippe eine Kategorie, damit Wörter gruppiert werden.',
-    'Unten siehst du die Kategorien und Wörter. Tippe ein Wort an, um es zu bearbeiten oder zu löschen.',
-    'Mehrere Kategorien auf einmal: Setze vor jede Gruppe eine Zeile „# Kategoriename“.',
+    'Tags: Mit Tags (#Tiere, #Verben …) gruppierst du Wörter. Ein Wort darf mehrere Tags haben. Im Feld „Tags für die neuen Wörter“ stehen die Tags für Zeilen ohne eigenen Tag.',
+    'Import mit Tags: Schreibe sie ans Zeilenende, z. B. „to eat = essen #Essen #Verben“. Eine Zeile „# Tagname“ gilt für alle folgenden Zeilen ohne eigenen Tag.',
+    'Vorhandene Tags: „Ansehen“ zeigt die Wörter, „Umbenennen“ benennt einen Tag um (gleiche Namen werden zusammengelegt). „Löschen“ entfernt den Tag; Wörter, die nur diesen Tag hatten, werden gelöscht.',
+    'Wort bearbeiten: Tippe auf ✎. Tags kannst du eintippen oder aus der Liste antippen.',
+    'Ein Wort mit gleichem Paar wird nicht doppelt angelegt, sondern bekommt die neuen Tags dazu.',
     'Mehrere richtige Antworten trennst du mit „/“.']],
   cards:['Karten',[
     'Bilder importieren: Aus der Galerie (mehrere auswählen) oder als ZIP-Datei mit vielen Bildern.',
@@ -778,7 +791,7 @@ function streakNow(){const s=S.streak;if(!s||!s.last)return 0;return (s.last===d
 
 function catDrop(key,sel,units,allLabel){
   const open=ui.catOpen===key,cb=on=>`<span class="cb ${on?'on':''}">${on?'✓':''}</span>`;
-  const label=!sel.length?allLabel:sel.length<=2?sel.join(', '):sel.length+' Kategorien';
+  const label=!sel.length?allLabel:sel.length<=2?sel.join(', '):sel.length+' Tags';
   return `<div class="catdrop"><button class="themesel" data-a="cat-open" data-k="${key}" aria-expanded="${open}"><span class="grow">${esc(label)}</span><span>${open?'▲':'▼'}</span></button>
   ${open?`<div class="themelist"><button class="theme ${!sel.length?'on':''}" data-a="cat-pick" data-k="${key}" data-u="">${cb(!sel.length)}${allLabel}</button>${units.map(u=>`<button class="theme ${sel.includes(u)?'on':''}" data-a="cat-pick" data-k="${key}" data-u="${esc(u)}">${cb(sel.includes(u))}${esc(u)}</button>`).join('')}</div>`:''}</div>`;
 }
@@ -787,7 +800,7 @@ function vHome(){
   if(!L) return `<div class="panel center"><h2>Willkommen!</h2><p class="muted">Lege im Elternbereich eine Sprache an.</p><button class="btn primary" data-a="nav" data-v="parent">Zum Elternbereich</button></div>`;
   const now=Date.now(),total=L.vocab.length;
   const units=unitsOf(L);ui.unit=ui.unit.filter(u=>units.includes(u));
-  const pool=ui.unit.length?L.vocab.filter(w=>ui.unit.includes(w.unit)).length:total;
+  const pool=ui.unit.length?L.vocab.filter(w=>tagsOf(w).some(t=>ui.unit.includes(t))).length:total;
   const n=Math.min(L.sessionSize,pool);
   const pct=Math.min(100,Math.round(L.points/L.goal*100));
   const st=streakNow(),nextT=(S.streakCfg.def.active||S.streakCfg.nextRid||S.streakCfg.nextPack)?nextStreakTarget(st,S.streakCfg.days):0;
@@ -877,14 +890,14 @@ function vList(){
   const L=curLang();
   if(!L) return `<div class="panel center"><p>Noch keine Sprache angelegt.</p></div>`;
   const units=unitsOf(L);ui.lf=ui.lf.filter(u=>units.includes(u));
-  const ws=sortWords(L.vocab.filter(w=>!ui.lf.length||ui.lf.includes(w.unit)),ui.ls.col,ui.ls.dir);
+  const ws=sortWords(L.vocab.filter(w=>!ui.lf.length||tagsOf(w).some(t=>ui.lf.includes(t))),ui.ls.col,ui.ls.dir);
   const ar=c=>ui.ls.col===c?(ui.ls.dir>0?' ▲':' ▼'):'';
   return `<div class="row"><h2 class="grow" style="margin:0">Vokabeln</h2><span class="pill">${ws.length} Wörter</span></div>
   <div style="height:10px"></div>${langChips()}
-  ${units.length>1?catDrop('list',ui.lf,units,'Alle Kategorien'):''}
+  ${units.length>1?catDrop('list',ui.lf,units,'Alle Tags'):''}
   <div class="panel lt">
-    <div class="lrow lhead"><button data-a="list-sort" data-c="f">${esc(L.name)}${ar('f')}</button><button data-a="list-sort" data-c="d">Deutsch${ar('d')}</button><button data-a="list-sort" data-c="u">Kategorie${ar('u')}</button><button data-a="list-sort" data-c="k">Stand${ar('k')}</button></div>
-    ${ws.length?ws.map(w=>`<div class="lrow"><b>${esc(w.f)}</b><span>${esc(w.d)}</span><span class="muted sm">${esc(w.unit)}</span>${lvl(w)}</div>`).join(''):'<div class="lrow"><span class="muted">Keine Wörter.</span></div>'}
+    <div class="lrow lhead"><button data-a="list-sort" data-c="f">${esc(L.name)}${ar('f')}</button><button data-a="list-sort" data-c="d">Deutsch${ar('d')}</button><button data-a="list-sort" data-c="u">Tags${ar('u')}</button><button data-a="list-sort" data-c="k">Stand${ar('k')}</button></div>
+    ${ws.length?ws.map(w=>`<div class="lrow"><b>${esc(w.f)}</b><span>${esc(w.d)}</span><span class="muted sm">${tagsOf(w).map(t=>'#'+esc(t)).join(' ')}</span>${lvl(w)}</div>`).join(''):'<div class="lrow"><span class="muted">Keine Wörter.</span></div>'}
   </div>`;
 }
 
@@ -1013,14 +1026,14 @@ function pLang(){
 function pVocab(L){
   const units=unitsOf(L);
   return `<div class="secbody">
-  <div class="field"><label for="vunit">Kategorie</label><input id="vunit" class="in" list="unitlist" data-input="vunit" value="${esc(ui.vunit)}" placeholder="z. B. Möbel" maxlength="40"><datalist id="unitlist">${units.map(u=>`<option value="${esc(u)}">`).join('')}</datalist></div>
+  <div class="field"><label for="vunit">Tags für die neuen Wörter</label><input id="vunit" class="in" data-input="vunit" value="${esc(ui.vunit)}" placeholder="z. B. #Möbel #Zuhause" maxlength="120"></div>
   <div class="field"><label for="vtext">Vokabeln, eine pro Zeile: Fremdwort = Deutsch</label><textarea id="vtext" class="in" rows="7" data-input="vtext" placeholder="dog = Hund&#10;to run = rennen&#10;trousers = Hose / Hosen">${esc(ui.vtext)}</textarea></div>
-  <p class="note">Mehrere Kategorien auf einmal: Vor jede Gruppe eine Zeile „# Kategoriename“ setzen.</p>
+  <p class="note">Tags pro Wort: <b>dog = Hund #Tiere #Haustiere</b>. Mehrere Gruppen auf einmal: Zeile „# Tagname“ vor die Gruppe setzen.</p>
   <p class="note">Mehrere richtige Antworten trennst du mit „/“. Text in Klammern ist optional, z. B. „(to) go“.</p>
   <button class="btn primary block" data-a="add-vocab">Hinzufügen</button>
-  <button class="subhead" data-a="toggle-cats" aria-expanded="${ui.cats}"><span>Vorhandene Kategorien (${units.length})</span><span>${ui.cats?'−':'+'}</span></button>
-  ${!ui.cats?'':units.length?units.map(u=>{const ws=L.vocab.filter(w=>w.unit===u);const open=ui.openUnit===u;
-    return `<div class="urow cat"><div class="t"><b>${esc(u)}</b><div class="note">${ws.length} Wörter</div></div><button class="btn small" data-a="open-unit" data-u="${esc(u)}">${open?'Zuklappen':'Ansehen'}</button><button class="btn small" data-a="rename-unit" data-u="${esc(u)}">Umbenennen</button>${confBtn('del-unit:'+u,'Löschen','')}</div>
+  <button class="subhead" data-a="toggle-cats" aria-expanded="${ui.cats}"><span>Vorhandene Tags (${units.length})</span><span>${ui.cats?'−':'+'}</span></button>
+  ${!ui.cats?'':units.length?units.map(u=>{const ws=L.vocab.filter(w=>hasTag(w,u));const open=ui.openUnit===u;
+    return `<div class="urow cat"><div class="t"><b>#${esc(u)}</b><div class="note">${ws.length} Wörter</div></div><button class="btn small" data-a="open-unit" data-u="${esc(u)}">${open?'Zuklappen':'Ansehen'}</button><button class="btn small" data-a="rename-unit" data-u="${esc(u)}">Umbenennen</button>${confBtn('del-unit:'+u,'Löschen','')}</div>
     ${open?ws.map(w=>`<div class="wrow"><div class="t">${esc(w.f)} = ${esc(w.d)}</div><button class="x edit" data-a="edit-word" data-id="${w.id}" aria-label="Wort bearbeiten">✎</button><button class="x" data-a="del-word" data-id="${w.id}" aria-label="Wort löschen">✕</button></div>`).join(''):''}`;}).join(''):'<p class="muted">Noch keine Vokabeln.</p>'}
   ${L.vocab.length?`<div style="margin-top:14px">${confBtn('reset-learn:x','Lernstand zurücksetzen','')}</div><p class="note">Setzt nur den Lernfortschritt der Wörter zurück. Punkte und Karten bleiben.</p>`:''}
   </div>`;
@@ -1134,14 +1147,15 @@ function vModal(){
     return wrap(`<h3>Wort bearbeiten</h3>
     <div class="field"><label for="we-f">${esc(L.name)}</label><input id="we-f" class="in" value="${esc(w.f)}" maxlength="80"></div>
     <div class="field"><label for="we-d">Deutsch</label><input id="we-d" class="in" value="${esc(w.d)}" maxlength="80"></div>
-    <div class="field"><label for="we-u">Kategorie</label><input id="we-u" class="in" list="unitlist2" value="${esc(w.unit)}" maxlength="40"><datalist id="unitlist2">${unitsOf(L).map(u=>`<option value="${esc(u)}">`).join('')}</datalist></div>
+    <div class="field"><label for="we-u">Tags</label><input id="we-u" class="in" value="${esc(tagsOf(w).map(t=>'#'+t).join(' '))}" maxlength="200">
+    <div class="tagpick">${unitsOf(L).map(u=>`<button type="button" class="tagchip ${hasTag(w,u)?'on':''}" data-a="wtag" data-t="${esc(u)}">#${esc(u)}</button>`).join('')}</div></div>
     <div class="row"><button class="btn primary grow" data-a="save-word" data-id="${w.id}">Speichern</button>${confBtn('del-wordm:'+w.id,'Löschen','')}</div>
     <button class="btn block" style="margin-top:8px" data-a="close-modal">Abbrechen</button>`);
   }
   if(m.t==='unit'){
-    return wrap(`<h3>Kategorie umbenennen</h3>
+    return wrap(`<h3>Tag umbenennen</h3>
     <div class="field"><label for="ue-name">Neuer Name</label><input id="ue-name" class="in" value="${esc(m.u)}" maxlength="40"></div>
-    <p class="note">Gibt es den Namen schon, werden beide Kategorien zusammengelegt.</p>
+    <p class="note">Gibt es den Namen schon, werden beide Tags zusammengelegt.</p>
     <button class="btn primary block" data-a="save-unit" data-u="${esc(m.u)}">Speichern</button>
     <button class="btn block" style="margin-top:8px" data-a="close-modal">Abbrechen</button>`);
   }
@@ -1557,16 +1571,16 @@ document.addEventListener('click',async e=>{
       save();render();break;}
     case 'add-vocab':{
       if(!L)break;
-      const def=(ui.vunit||'').trim()||'Allgemein';
-      const secs=parseSections(ui.vtext,def);let skipped=0,n=0,dup=0,any=false;
-      for(const sec of secs){skipped+=sec.skipped;
-        for(const it of sec.items){any=true;
-          if(L.vocab.some(w=>w.unit===sec.unit&&w.f.toLowerCase()===it.f.toLowerCase()&&w.d.toLowerCase()===it.d.toLowerCase())){dup++;continue;}
-          L.vocab.push({id:uid(),f:it.f,d:it.d,unit:sec.unit,box:1,due:0,seen:0,right:0,wrong:0});n++;
-        }}
-      if(!any){toast('Keine Zeile mit „=“ gefunden.');break;}
+      const def=splitTags(ui.vunit);
+      const r=parseSections(ui.vtext,def.length?def:['Allgemein']);let n=0,dup=0,upd=0;
+      for(const it of r.items){
+        const ex=L.vocab.find(w=>w.f.toLowerCase()===it.f.toLowerCase()&&w.d.toLowerCase()===it.d.toLowerCase());
+        if(ex){const add=it.tags.filter(t=>!ex.tags.some(x=>x.toLowerCase()===t.toLowerCase()));if(add.length){ex.tags=ex.tags.concat(add);upd++;}else dup++;continue;}
+        L.vocab.push({id:uid(),f:it.f,d:it.d,tags:it.tags.slice(),box:1,due:0,seen:0,right:0,wrong:0});n++;
+      }
+      if(!r.items.length){toast('Keine Zeile mit „=“ gefunden.');break;}
       ui.vtext='';save();render();
-      toast(n+' hinzugefügt'+(dup?`, ${dup} doppelt`:'')+(skipped?`, ${skipped} Zeile(n) übersprungen`:''));break;}
+      toast(n+' hinzugefügt'+(upd?`, ${upd} um Tags ergänzt`:'')+(dup?`, ${dup} schon vorhanden`:'')+(r.skipped?`, ${r.skipped} Zeile(n) übersprungen`:''));break;}
     case 'theme':S.theme=THEMES.some(t=>t.k===d.k)?d.k:'blau';ui.themeOpen=false;save();render();break;
     case 'back':S.cardBack=clamp(d.n,1,BACKS.length);save();render();break;
     case 'back-step':S.cardBack=((S.cardBack-1+(+d.d)+BACKS.length)%BACKS.length)+1;save();render();break;
@@ -1576,17 +1590,19 @@ document.addEventListener('click',async e=>{
     case 'rename-unit':ui.modal={t:'unit',u:d.u};render();break;
     case 'save-unit':{
       const nn=val('#ue-name').trim();if(!nn){toast('Der Name darf nicht leer sein.');break;}
-      L.vocab.forEach(w=>{if(w.unit===d.u)w.unit=nn;});
+      const nt=normTag(nn);if(!nt){toast('Der Name darf nicht leer sein.');break;}
+      L.vocab.forEach(w=>{if(hasTag(w,d.u)){w.tags=splitTags(w.tags.map(t=>t===d.u?nt:t).join('#'));}});
       if(ui.openUnit===d.u)ui.openUnit=nn;ui.unit=[];ui.lf=[];ui.modal=null;save();render();toast('Umbenannt');break;}
     case 'del-unit':{
       if(!ask(d.key))break;
-      const u=d.key.slice('del-unit:'.length);L.vocab=L.vocab.filter(w=>w.unit!==u);if(ui.openUnit===u)ui.openUnit='';save();render();break;}
+      const u=d.key.slice('del-unit:'.length);L.vocab=L.vocab.filter(w=>!(hasTag(w,u)&&w.tags.length===1));L.vocab.forEach(w=>{w.tags=w.tags.filter(t=>t!==u);});if(ui.openUnit===u)ui.openUnit='';save();render();break;}
+    case 'wtag':{const i=$('#we-u');if(!i)break;let t=splitTags(i.value);const k=t.findIndex(x=>x.toLowerCase()===d.t.toLowerCase());if(k>=0)t.splice(k,1);else t.push(d.t);i.value=t.map(x=>'#'+x).join(' ');el.classList.toggle('on',k<0);break;}
     case 'edit-word':ui.modal={t:'word',id:d.id};render();break;
     case 'save-word':{
       const w=L.vocab.find(x=>x.id===d.id);if(!w)break;
-      const f=val('#we-f').trim(),dd=val('#we-d').trim(),u=val('#we-u').trim();
+      const f=val('#we-f').trim(),dd=val('#we-d').trim(),u=splitTags(val('#we-u'));
       if(!f||!dd){toast('Beide Wörter müssen ausgefüllt sein.');break;}
-      w.f=f;w.d=dd;w.unit=u||'Allgemein';save();ui.modal=null;render();toast('Gespeichert');break;}
+      w.f=f;w.d=dd;w.tags=u.length?u:['Allgemein'];save();ui.modal=null;render();toast('Gespeichert');break;}
     case 'del-wordm':{
       if(!ask(d.key))break;
       const id=d.key.split(':')[1];L.vocab=L.vocab.filter(w=>w.id!==id);save();ui.modal=null;render();break;}
