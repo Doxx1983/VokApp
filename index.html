@@ -140,6 +140,10 @@ textarea.in{resize:vertical;min-height:120px}
 .r-n{--rc:var(--r-n)}.r-s{--rc:var(--r-s)}.r-e{--rc:var(--r-e)}.r-l{--rc:var(--r-l)}
 @keyframes shine{from{background-position:150% 0}to{background-position:-100% 0}}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tile.selected{outline:4px solid var(--streak);outline-offset:-2px;border-radius:12px}
+.tile{position:relative}
+.selmark{position:absolute;right:6px;top:6px;width:26px;height:26px;border-radius:50%;background:var(--surface);color:var(--ink);border:2px solid var(--line);display:grid;place-items:center;font-weight:900;font-size:15px}
+.tile.selected .selmark{background:var(--streak);color:#111;border-color:var(--streak)}
 .grid button.tile{appearance:none;border:0;background:none;padding:0;cursor:pointer;color:inherit;font:inherit;text-align:left}
 .packgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
 .flip{appearance:none;border:0;background:none;padding:0;perspective:900px;aspect-ratio:63/88;cursor:pointer;width:100%}
@@ -339,6 +343,7 @@ function parseVocab(text){
   }
   return {items,skipped};
 }
+const cardKey=n=>String(n).toLowerCase().replace(/[^a-z0-9äöüß]/g,'');
 function cleanCardName(fn){
   const s=String(fn).replace(/\.[^.]+$/,'').replace(/[_\-+]+/g,' ').replace(/\s+/g,' ').trim();
   if(!s) return 'Karte';
@@ -628,7 +633,7 @@ function starterBlob(emoji,color){
 }
 
 /* ================= Zustand der Oberfläche ================= */
-const ui={view:'home',setupErr:'',lockErr:'',lockPin:false,sm:'p',sg:'d',unit:[],catOpen:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
+const ui={view:'home',selMode:false,cardSel:[],setupErr:'',lockErr:'',lockPin:false,sm:'p',sg:'d',unit:[],catOpen:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
 let Q=null,deferredInstall=null,confirmT,rec=null;
 
 /* ================= Ansichten ================= */
@@ -900,7 +905,11 @@ function pCards(L){
   <p class="note">Wird auf der Startseite und beim Öffnen der Päckchen gezeigt. Ein schwarzer Hintergrund wird automatisch entfernt. Das Bild bleibt auf diesem Handy und ist in der Sicherung enthalten.</p>
   <div id="busy" class="busy" ${ui.busy?'':'hidden'}>${esc(ui.busy)}</div>
   <p class="note" style="margin-top:12px">${L.cards.length} Karten · ${cnt}</p>
-  <div class="grid">${L.cards.map(c=>`<button class="tile" data-a="edit-card" data-id="${c.id}">${cardFace(c,false,0)}</button>`).join('')}</div>
+  ${missingImgs(L)?`<button class="btn block" data-a="merge-dups" style="margin-bottom:8px">Doppelte Karten zusammenführen</button><p class="note">Hat eine Karte ohne Bild eine gleichnamige Karte mit Bild, bekommt sie deren Bild. Das Duplikat verschwindet, Seltenheit und gesammelte Karten bleiben erhalten.</p>`:''}
+  <div class="row" style="margin:8px 0"><button class="btn small ${ui.selMode?'primary':''}" data-a="sel-mode">${ui.selMode?'Auswahl beenden':'Auswählen'}</button>
+  ${ui.selMode?`<button class="btn small" data-a="sel-all">Alle</button><button class="btn small" data-a="sel-missing">Ohne Bild (${missingImgs(L)})</button><button class="btn small" data-a="sel-none">Keine</button>`:''}</div>
+  ${ui.selMode?`<div class="row" style="margin-bottom:8px"><span class="pill">${ui.cardSel.length} ausgewählt</span>${ui.cardSel.length?confBtn('del-sel:x','Ausgewählte löschen (' + ui.cardSel.length + ')'):''}</div>`:''}
+  <div class="grid">${L.cards.map(c=>ui.selMode?`<button class="tile ${ui.cardSel.includes(c.id)?'selected':''}" data-a="sel-card" data-id="${c.id}" aria-pressed="${ui.cardSel.includes(c.id)}">${cardFace(c,false,0)}<span class="selmark">${ui.cardSel.includes(c.id)?'✓':''}</span></button>`:`<button class="tile" data-a="edit-card" data-id="${c.id}">${cardFace(c,false,0)}</button>`).join('')}</div>
   </div>`;
 }
 function pPrizes(L){
@@ -1243,9 +1252,21 @@ function ask(key){
   if(ui.confirm!==key){ui.confirm=key;clearTimeout(confirmT);confirmT=setTimeout(()=>{ui.confirm=null;render();},4000);render();return false;}
   ui.confirm=null;clearTimeout(confirmT);return true;
 }
+async function mergeDuplicates(L){
+  let n=0;
+  for(const m of L.cards.slice()){
+    if(!L.cards.includes(m)||IMG[m.id])continue;
+    const x=L.cards.find(c=>c!==m&&IMG[c.id]&&cardKey(c.name)===cardKey(m.name));
+    if(!x)continue;
+    await putImg(m.id,BLOBS[x.id]);
+    L.owned[m.id]=(L.owned[m.id]||0)+(L.owned[x.id]||0);delete L.owned[x.id];
+    L.cards=L.cards.filter(c=>c!==x);await delImg(x.id);n++;
+  }
+  return n;
+}
 const IMPSTAT={n:0,r:0};
 async function addOrRestore(L,fname,blob,rarity){
-  const nm=cleanCardName(fname),ex=L.cards.find(c=>c.name===nm&&!IMG[c.id]);
+  const nm=cleanCardName(fname),k=cardKey(nm),ex=L.cards.find(c=>!IMG[c.id]&&cardKey(c.name)===k);
   if(ex){await putImg(ex.id,blob);IMPSTAT.r++;return;}
   const id=uid();await putImg(id,blob);L.cards.push({id,name:nm,rarity});IMPSTAT.n++;
 }
@@ -1291,7 +1312,7 @@ document.addEventListener('click',async e=>{
   const d=el.dataset,L=curLang();
   switch(d.a){
     case 'nav':if(Q&&Q.listening)stopListen();if(ui.view==='parent'&&d.v!=='parent')ui.unlocked=false;ui.view=d.v;ui.modal=null;ui.pinErr='';render();break;
-    case 'lang':S.activeLang=d.id;ui.unit=[];ui.lf=[];ui.catOpen='';save();render();break;
+    case 'lang':S.activeLang=d.id;ui.cardSel=[];ui.unit=[];ui.lf=[];ui.catOpen='';save();render();break;
     case 'cat-open':ui.catOpen=ui.catOpen===d.k?'':d.k;render();break;
     case 'cat-pick':{const a=d.k==='home'?ui.unit:ui.lf;if(d.u==='')a.length=0;else{const i=a.indexOf(d.u);if(i<0)a.push(d.u);else a.splice(i,1);}render();break;}
     case 'mode':S.mode=d.m==='speak'?'speak':'write';save();render();break;
@@ -1346,6 +1367,18 @@ document.addEventListener('click',async e=>{
       const c=L.cards.find(x=>x.id===d.id);if(!c)break;
       c.name=val('#ced-name').trim()||c.name;c.rarity=val('#ced-rar');
       save();ui.modal=null;render();break;}
+    case 'sel-mode':ui.selMode=!ui.selMode;ui.cardSel=[];render();break;
+    case 'sel-card':{const i=ui.cardSel.indexOf(d.id);if(i<0)ui.cardSel.push(d.id);else ui.cardSel.splice(i,1);render();break;}
+    case 'sel-all':if(L){ui.cardSel=L.cards.map(c=>c.id);render();}break;
+    case 'sel-none':ui.cardSel=[];render();break;
+    case 'sel-missing':if(L){ui.cardSel=L.cards.filter(c=>!IMG[c.id]).map(c=>c.id);render();}break;
+    case 'del-sel':{
+      if(!L||!ask(d.key))break;
+      const ids=new Set(ui.cardSel);
+      L.cards=L.cards.filter(c=>!ids.has(c.id));
+      for(const id of ids){delete L.owned[id];await delImg(id);}
+      const n=ids.size;ui.cardSel=[];ui.selMode=false;save();render();toast(n+' Karten gelöscht');break;}
+    case 'merge-dups':if(L){setBusy('Führe zusammen …');const n=await mergeDuplicates(L);save();setBusy('');render();toast(n?n+' Karten zusammengeführt':'Keine passenden Doppelten gefunden');}break;
     case 'del-card':{
       if(!ask(d.key))break;
       const id=d.key.split(':')[1];L.cards=L.cards.filter(c=>c.id!==id);delete L.owned[id];await delImg(id);
