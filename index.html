@@ -188,6 +188,7 @@ nav button.on{color:var(--accent-text,var(--accent));background:var(--accent-sof
 .secbody{background:var(--surface);border-radius:0 0 16px 16px;padding:14px 16px;margin-top:-10px;box-shadow:var(--shadow)}
 .sechead.on{border-radius:16px 16px 0 0;position:relative;z-index:1}
 .urow{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.urow.cat{flex-wrap:wrap}.urow.cat .t{flex:1 1 100%}.urow.cat>.btn{flex:1 1 0;padding-left:6px;padding-right:6px}
 .urow:last-child{border:0}
 .urow .t{flex:1;min-width:0;overflow-wrap:anywhere}
 .wrow{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:15px}
@@ -1019,7 +1020,7 @@ function pVocab(L){
   <button class="btn primary block" data-a="add-vocab">Hinzufügen</button>
   <button class="subhead" data-a="toggle-cats" aria-expanded="${ui.cats}"><span>Vorhandene Kategorien (${units.length})</span><span>${ui.cats?'−':'+'}</span></button>
   ${!ui.cats?'':units.length?units.map(u=>{const ws=L.vocab.filter(w=>w.unit===u);const open=ui.openUnit===u;
-    return `<div class="urow" style="flex-wrap:wrap"><div class="t"><b>${esc(u)}</b><div class="note">${ws.length} Wörter</div></div><button class="btn small" data-a="open-unit" data-u="${esc(u)}">${open?'Zuklappen':'Ansehen'}</button><button class="btn small" data-a="rename-unit" data-u="${esc(u)}">Umbenennen</button>${confBtn('del-unit:'+u,'Löschen','')}</div>
+    return `<div class="urow cat"><div class="t"><b>${esc(u)}</b><div class="note">${ws.length} Wörter</div></div><button class="btn small" data-a="open-unit" data-u="${esc(u)}">${open?'Zuklappen':'Ansehen'}</button><button class="btn small" data-a="rename-unit" data-u="${esc(u)}">Umbenennen</button>${confBtn('del-unit:'+u,'Löschen','')}</div>
     ${open?ws.map(w=>`<div class="wrow"><div class="t">${esc(w.f)} = ${esc(w.d)}</div><button class="x edit" data-a="edit-word" data-id="${w.id}" aria-label="Wort bearbeiten">✎</button><button class="x" data-a="del-word" data-id="${w.id}" aria-label="Wort löschen">✕</button></div>`).join(''):''}`;}).join(''):'<p class="muted">Noch keine Vokabeln.</p>'}
   ${L.vocab.length?`<div style="margin-top:14px">${confBtn('reset-learn:x','Lernstand zurücksetzen','')}</div><p class="note">Setzt nur den Lernfortschritt der Wörter zurück. Punkte und Karten bleiben.</p>`:''}
   </div>`;
