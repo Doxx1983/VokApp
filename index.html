@@ -27,7 +27,8 @@
   --shadow:0 6px 18px rgba(0,0,0,.4);color-scheme:dark}
 }
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;scrollbar-width:none}
+html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;width:0}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 var(--font);-webkit-tap-highlight-color:transparent}
 #app{max-width:560px;margin:0 auto;padding:calc(12px + env(safe-area-inset-top)) 16px calc(92px + env(safe-area-inset-bottom))}
 body.immersive #app{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
@@ -673,7 +674,7 @@ function vHome(){
   </div>
   <div class="seg seg3" role="group" aria-label="Wörter pro Lerneinheit">${[10,20,30].map(k=>`<button class="${L.sessionSize===k?'on':''}" data-a="size" data-n="${k}">${k} Wörter</button>`).join('')}</div>
   ${S.mode==='speak'&&!SRClass()?`<p class="note">Auf diesem Gerät gibt es keine Spracherkennung. Du sagst das Wort laut und bewertest dich danach selbst.</p>`:''}
-  <div style="height:128px"></div>
+  <div style="height:var(--startgap,100px)"></div>
   <div class="startbar"><button class="btn primary block ${st>0?'streakon':''}" style="font-size:22px;min-height:96px" data-a="start">Lernen starten</button></div>`
   :`<div class="panel center"><h3>Noch keine Vokabeln</h3><p class="muted">Mama oder Papa tragen sie im Elternbereich ein.</p><button class="btn primary" data-a="nav" data-v="parent">Zum Elternbereich</button></div>`}`;
 }
