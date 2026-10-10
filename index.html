@@ -470,7 +470,8 @@ function migrate(s){
   s.rewards=Array.isArray(s.rewards)?s.rewards:[];
   s.cardBack=Math.min(Math.max(Math.round(+s.cardBack)||1,1),BACKS.length);
   s.pomo=s.pomo&&typeof s.pomo==='object'&&+s.pomo.start?s.pomo:null;
-  if(s.pomo&&s.pomo.lock&&typeof s.pomo.left!=='number')s.pomo.left=300;
+  if(s.pomo&&s.pomo.lock&&!(+s.pomo.until>0))s.pomo.until=Date.now()+(+s.pomo.left>0?s.pomo.left*1000:300000);
+  const pc=s.pomoCfg=s.pomoCfg||{};pc.work=Math.min(90,Math.max(1,Math.round(+pc.work)||25));pc.brk=Math.min(30,Math.max(1,Math.round(+pc.brk)||5));pc.idle=Math.min(30,Math.max(1,Math.round(+pc.idle)||5));
   s.streak=s.streak||{last:null,count:0};s.streak.best=Math.max(s.streak.best||0,s.streak.count||0);
   s.theme=THEME_DEFS.some(t=>t.k===s.theme)?s.theme:'blau';
   delete s.streakRewards;
@@ -517,17 +518,15 @@ function seriesWeeks(log,now,n){
 }
 function fmtDur(s){s=Math.round(s||0);if(s<60)return s+' Sek.';const m=Math.round(s/60);if(m<60)return m+' Min.';return Math.floor(m/60)+':'+String(m%60).padStart(2,'0')+' Std.';}
 /* Pomodoro: 25 Min. Lernzeit, dann 5 Min. gesperrte Pause. Pause nach Ende einer Runde > 5 Min. setzt den Timer zurück. */
-const POMO_WORK=25*60000,POMO_BREAK_SEC=300,POMO_IDLE=5*60000;
-/* Lernzeit nutzt die Uhr; die Pause ist ein eigener Countdown (p.left in Sekunden) und beginnt erst, wenn keine Runde offen ist */
-function pomoStep(p,now,inQuiz){
+/* cfg in Millisekunden: {work,brk,idle}. Die Pause endet zum Zeitpunkt p.until (vertrauenswürdige Zeit) und beginnt erst nach einer Runde. */
+function pomoStep(p,now,inQuiz,tnow,cfg){
   if(!p)return null;
-  if(p.lock)return p;
-  if(p.idle!=null&&now-p.idle>=POMO_IDLE)return null;
-  if(now-p.start>=POMO_WORK&&!inQuiz)return {...p,lock:true,left:POMO_BREAK_SEC};
+  if(p.lock)return tnow>=p.until?null:p;
+  if(p.idle!=null&&now-p.idle>=cfg.idle)return null;
+  if(now-p.start>=cfg.work&&!inQuiz)return {...p,lock:true,until:tnow+cfg.brk};
   return p;
 }
-function pomoCount(p,dt){return !p||!p.lock?p:(p.left-dt<=0?null:{...p,left:p.left-dt});}
-function pomoOnStart(p,now){p=pomoStep(p,now,false);if(p&&p.lock)return p;return p?{...p,idle:null}:{start:now,idle:null};}
+function pomoOnStart(p,now,cfg){p=pomoStep(p,now,false,0,cfg);if(p&&p.lock)return p;return p?{...p,idle:null}:{start:now,idle:null};}
 function pomoOnEnd(p,now){return p&&!p.lock?{...p,idle:now}:p;}
 //LOGIC-END
 
@@ -854,6 +853,7 @@ function vParent(){
   h+=secBtn('cards','Karten');if(ui.sec==='cards')h+=L?pCards(L):noLang();
   h+=secBtn('prizes','Spezielle Belohnungen');if(ui.sec==='prizes')h+=L?pPrizes(L):noLang();
   h+=secBtn('streak','Serien-Belohnung');if(ui.sec==='streak')h+=pStreak();
+  h+=secBtn('pomo','Lernpause');if(ui.sec==='pomo')h+=pPomo();
   h+=secBtn('reward','Punkte &amp; Abfrage');if(ui.sec==='reward')h+=L?pReward(L):noLang();
   h+=secBtn('backup','Sicherung &amp; PIN');if(ui.sec==='backup')h+=pBackup();
   return h;
@@ -917,6 +917,16 @@ function pPrizes(L){
 }
 function rewardOpts(sel){
   return '<option value="">– keine –</option>'+S.rewards.map(r=>`<option value="${r.id}" ${r.id===sel?'selected':''}>${esc(r.text)}${r.active?'':' (pausiert)'}</option>`).join('');
+}
+function pPomo(){
+  const c=S.pomoCfg,p=S.pomo;
+  const st=!p?'Der Timer läuft nicht.':p.lock?'Pause läuft.':'Der Timer läuft seit '+Math.floor((Date.now()-p.start)/60000)+' Min.';
+  return `<div class="secbody"><p class="note">Nach der eingestellten Lernzeit wird die App nach der laufenden Runde für die Pause gesperrt. Entsperren geht nur mit der PIN. Die Pause zählt auch bei geschlossener App weiter. ${st}</p>
+  <div class="field"><label for="pm-work">Lernzeit bis zur Pause (Minuten)</label><input id="pm-work" class="in" type="number" inputmode="numeric" min="1" max="90" value="${c.work}" data-change="pomo" data-k="work"></div>
+  <div class="field"><label for="pm-brk">Dauer der Pause (Minuten)</label><input id="pm-brk" class="in" type="number" inputmode="numeric" min="1" max="30" value="${c.brk}" data-change="pomo" data-k="brk"></div>
+  <div class="field"><label for="pm-idle">Neustart des Timers nach Lernpause von (Minuten)</label><input id="pm-idle" class="in" type="number" inputmode="numeric" min="1" max="30" value="${c.idle}" data-change="pomo" data-k="idle"></div>
+  <div class="row"><button class="btn grow" data-a="pomo-test">Pause jetzt testen</button><button class="btn grow" data-a="pomo-reset">Timer zurücksetzen</button></div>
+  <p class="note">Zum Testen: Lernzeit und Pause auf 1 Minute stellen oder „Pause jetzt testen“ tippen. Danach die Werte wieder auf z. B. 25 und 5 setzen.</p></div>`;
 }
 function pStreak(){
   const c=S.streakCfg,d=c.def,sr=S.rewards.find(r=>r.id===c.nextRid);
@@ -1020,7 +1030,7 @@ function renderLock(){
     }
     return;
   }
-  const left=Math.max(0,Math.ceil(p.left)),t=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');
+  const left=Math.max(0,Math.ceil((p.until-tNow())/1000)),t=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');
   const sig=(ui.lockPin?'p':'b')+ui.lockErr;
   if(el.hidden||el.dataset.sig!==sig){
     el.hidden=false;el.dataset.sig=sig;
@@ -1032,19 +1042,28 @@ function renderLock(){
 function endPause(){
   S.pomo=null;ui.lockPin=false;ui.lockErr='';save();renderLock();render();
 }
-let lastPerf=null,lastSave=0;
+/* Vertrauenswürdige Zeit: beim Öffnen wird die Serverzeit (Date-Header) geholt; danach läuft sie monoton weiter. Ohne Netz gilt die Handy-Uhr. */
+let srv0=0,perf0=0,synced=false,timeReady=false;
+const perfNow=()=>(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+const tNow=()=>synced?srv0+(perfNow()-perf0):Date.now();
+async function syncTime(){
+  try{
+    const t0=perfNow(),ac=typeof AbortController!=='undefined'?new AbortController():null,to=ac?setTimeout(()=>ac.abort(),4000):0;
+    const r=await fetch(location.pathname+'?t='+Date.now(),{method:'HEAD',cache:'no-store',signal:ac?ac.signal:undefined});
+    if(to)clearTimeout(to);
+    const d=r.headers.get('date'),s=d?Date.parse(d):0,t1=perfNow();
+    if(s>0){srv0=s+(t1-t0)/2;perf0=t1;synced=true;}
+  }catch(e){}
+  timeReady=true;pomoTick();
+}
+function pomoCfgMs(){const c=S.pomoCfg;return {work:c.work*60000,brk:c.brk*60000,idle:c.idle*60000};}
 function pomoTick(){
-  const pn=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
-  const dt=lastPerf===null?0:Math.min(Math.max((pn-lastPerf)/1000,0),60);lastPerf=pn;
   const now=Date.now(),before=S.pomo,wasLocked=!!(before&&before.lock);
-  let p=pomoStep(before,now,ui.view==='quiz');
-  if(p&&p.lock)p=pomoCount(p,wasLocked?dt:0);
+  let p=before;
+  if(!(wasLocked&&!timeReady))p=pomoStep(before,now,ui.view==='quiz',tNow(),pomoCfgMs());
   S.pomo=p;
   const isLocked=!!(p&&p.lock);
-  if(p!==before){
-    if(wasLocked&&!isLocked){save();render();}
-    else if(!wasLocked||!isLocked||pn-lastSave>5000){save();lastSave=pn;}
-  }
+  if(p!==before){save();if(wasLocked&&!isLocked)render();}
   if(isLocked&&!wasLocked){if(Q&&Q.listening)stopListen();ui.lockPin=false;ui.lockErr='';}
   renderLock();
   if(!isLocked){try{localStorage.setItem(POMO_HB,String(now));}catch(e){}}
@@ -1103,7 +1122,7 @@ function startQuiz(){
   const ids=pickSession(L.vocab,ui.unit,L.sessionSize,Date.now());
   if(!ids.length){toast('Keine Wörter in dieser Liste');return;}
   if(S.pomo&&S.pomo.lock)return;
-  S.pomo=pomoOnStart(S.pomo,Date.now());
+  S.pomo=pomoOnStart(S.pomo,Date.now(),pomoCfgMs());
   const speak=S.mode==='speak';
   const dirOf=()=>speak?'d2f':(L.dir==='mix'?(Math.random()<.5?'f2d':'d2f'):L.dir);
   Q={langId:L.id,mode:speak?'speak':'write',queue:ids.map(id=>({id,dir:dirOf(),first:true,attempts:0})),total:ids.length,t0:Date.now(),phase:'ask',hint:0,earned:0,rightFirst:0,packs:0,fb:null,last:null,listening:false,speechMsg:''};
@@ -1398,6 +1417,8 @@ document.addEventListener('click',async e=>{
       const id=d.key.split(':')[1];S.rewards=S.rewards.filter(r=>r.id!==id);save();ui.modal=null;render();break;}
     case 'redeem':{
       const w=L.wins.find(x=>x.id===d.id);if(w){w.redeemed=true;w.redeemedTs=Date.now();save();render();}break;}
+    case 'pomo-test':S.pomo={lock:true,until:tNow()+S.pomoCfg.brk*60000,start:Date.now(),idle:null};save();pomoTick();break;
+    case 'pomo-reset':S.pomo=null;save();toast('Timer zurückgesetzt');render();break;
     case 'toggle-sdef':S.streakCfg.def.active=!S.streakCfg.def.active;save();render();break;
     case 'del-packimg':{if(!ask(d.key))break;await delImg(PACK_KEY);render();toast('Standard-Päckchen wird gezeigt');break;}
     case 'starter':addStarter();break;
@@ -1412,6 +1433,7 @@ document.addEventListener('change',async e=>{
   const el=e.target,k=el.dataset&&el.dataset.change;if(!k)return;
   const L=curLang();
   if(k==='imprar')ui.imprar=el.value;
+  else if(k==='pomo'){const key=el.dataset.k,lim={work:[1,90],brk:[1,30],idle:[1,30]}[key];if(lim){S.pomoCfg[key]=clamp(el.value,lim[0],lim[1]);save();render();}}
   else if(k==='scfg'){
     const c=S.streakCfg,key=el.dataset.k;
     if(key==='days')c.days=clamp(el.value,1,365);
@@ -1458,7 +1480,7 @@ document.addEventListener('keydown',e=>{
   }
   else if(ui.view==='parent'&&!ui.unlocked){const b=document.querySelector('[data-a="pin-go"],[data-a="pin-set"]');if(b)b.click();}
 });
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save();else syncTime();});
 window.addEventListener('pagehide',()=>save());
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;});
 
@@ -1467,7 +1489,7 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredIns
   try{db=await idbOpen();const all=await idbAll();for(const id of Object.keys(all)){BLOBS[id]=all[id];IMG[id]=URL.createObjectURL(all[id]);}}catch(e){db=null;}
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
   try{const hb=+(localStorage.getItem(POMO_HB)||0);if(S.pomo&&!S.pomo.lock&&S.pomo.idle==null&&hb)S.pomo.idle=hb;}catch(e){}
-  pomoTick();save();render();setInterval(pomoTick,1000);
+  pomoTick();save();render();setInterval(pomoTick,1000);syncTime();
   if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
