@@ -35,7 +35,7 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 - Karten-Pack-Bild (urheberrechtlich) ist nicht im Repo; wird vom Nutzer hochgeladen.
 
 ## Vokabel-Kategorien
-Bestehende Kategorien des Nutzers in der App (er benennt sie selbst um, die „ 1“ ist nicht nötig): Möbel, Früchte, Kleidung, Haustiere, Tiere, Schule, Verben, Familie. Gewünscht zusätzlich: Schulfächer.
-`docs/englisch-341-vokabeln.txt` (341 Wörter, britisches Englisch) nutzt diese Namen, damit die Wörter zusammengeführt werden. Weitere Kategorien: Begrüßung & Höflichkeit (14), Fragewörter & kleine Wörter (13), Körper (14), Gefühle (12), Farben (12), Zahlen (16), Essen & Trinken (20), Gemüse (7), Zuhause (10), Wetter & Jahreszeiten (12), Tage & Monate (19), Stadt & Verkehr (14), Spiel & Sport (14), Natur (12), Adjektive & Gegensätze (20).
-Zugeordnet: Familie (16), Haustiere (8), Tiere (23, Bauernhof + wilde Tiere), Früchte (13), Kleidung (14), Möbel (9), Schule (14), Schulfächer (11), Verben (24).
+Bestehende Kategorien des Nutzers (er benennt sie selbst um): Möbel, Früchte, Kleidung, Haustiere, Tiere, Schule, Verben, Familie; gewünscht zusätzlich Schulfächer.
+`docs/englisch-vokabeln.txt` (1041 Wörter, britisches Englisch, jede Kategorie mindestens 30 Wörter) nutzt diese Namen, damit die Wörter zusammengeführt werden. Verben sind thematisch auf die Kategorien verteilt (z. B. to eat → Essen & Trinken); „Verben“ enthält die allgemeinen Grundverben.
+Kategorien: Begrüßung & Höflichkeit (40), Fragewörter & kleine Wörter (45), Familie (45), Körper (45), Gefühle (41), Haustiere (38), Tiere (45), Farben (42), Zahlen (45), Essen & Trinken (45), Früchte (43), Gemüse (37), Kleidung (45), Möbel (37), Zuhause (42), Schule (45), Schulfächer (43), Wetter & Jahreszeiten (45), Tage & Monate (45), Stadt & Verkehr (45), Spiel & Sport (45), Natur (45), Adjektive & Gegensätze (45), Verben (48).
 Import: Elternbereich → Einzelne Sprache → Englisch → Vokabeln → gesamten Dateiinhalt einfügen → „Hinzufügen“. Identische Paare in derselben Kategorie werden übersprungen.
