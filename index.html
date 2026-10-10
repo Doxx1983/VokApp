@@ -233,6 +233,7 @@ const RARITIES=[
   {k:'e',label:'Episch',w:10,stars:3},
   {k:'l',label:'Legendär',w:2,stars:4}
 ];
+const SPECIAL_PACKS={big:{name:'Big-Pack',n:5,desc:'5 Karten'},mega:{name:'Mega-Pack',n:7,desc:'7 Karten'},epic:{name:'Epic-Pack',n:3,only:'e',desc:'3 epische Karten'},legend:{name:'Legend-Pack',n:1,only:'l',desc:'1 legendäre Karte'}};
 function norm(s){
   return String(s).normalize('NFC').toLowerCase().trim().replace(/[.!?¡¿,]+$/g,'').replace(/\s+/g,' ').trim();
 }
@@ -321,6 +322,11 @@ function drawCards(items,n,rnd){
     if(it.once) pool=pool.filter(c=>c!==it);
   }
   return out;
+}
+function packDraw(t,pool,rnd){
+  const sp=SPECIAL_PACKS[t];if(!sp)return null;
+  let p=pool;if(sp.only){const f=pool.filter(c=>c.rarity===sp.only);if(f.length)p=f;}
+  return drawCards(p,sp.n,rnd);
 }
 function chances(items){
   const avail=RARITIES.filter(r=>items.some(i=>i.rarity===r.k));
@@ -486,14 +492,14 @@ function migrate(s){
   s.theme=THEME_DEFS.some(t=>t.k===s.theme)?s.theme:'blau';
   delete s.streakRewards;
   const c=s.streakCfg=s.streakCfg||{};c.days=Math.max(1,Math.min(365,+c.days||5));
-  c.def=c.def||{};c.def.active=!!c.def.active;c.def.kind=c.def.kind==='text'?'text':'pack';c.def.packs=Math.max(1,Math.min(10,+c.def.packs||1));c.def.rid=c.def.rid||'';
-  c.nextRid=c.nextRid||'';
+  c.def=c.def||{};c.def.active=!!c.def.active;c.def.kind=(c.def.kind==='text'||SPECIAL_PACKS[c.def.kind])?c.def.kind:'pack';c.def.packs=Math.max(1,Math.min(10,+c.def.packs||1));c.def.rid=c.def.rid||'';
+  c.nextRid=c.nextRid||'';c.nextPack=SPECIAL_PACKS[c.nextPack]?c.nextPack:'';if(c.nextPack)c.nextRid='';
   s.streak=s.streak||{last:null,count:0};
   s.langs.forEach(l=>{
     l.log=l.log&&typeof l.log==='object'?l.log:{};l.wins=l.wins||[];l.owned=l.owned||{};l.cards=l.cards||[];l.vocab=l.vocab||[];
     l.speechLang=(!l.speechLang||l.speechLang==='auto'||l.speechLang===speechLangFor(l.name))?'auto':l.speechLang;
     l.goal=l.goal||100;l.ppr=l.ppr||10;l.packSize=l.packSize||3;l.sessionSize=Math.min(30,Math.max(10,Math.round((+l.sessionSize||10)/10)*10));l.dir=l.dir||'mix';
-    l.points=l.points||0;l.packs=l.packs||0;l.totalPoints=l.totalPoints||0;
+    l.points=l.points||0;l.packs=l.packs||0;l.sp=(Array.isArray(l.sp)?l.sp:[]).filter(t=>SPECIAL_PACKS[t]);l.totalPoints=l.totalPoints||0;
   });
   if(!s.langs.find(l=>l.id===s.activeLang)) s.activeLang=s.langs[0]?s.langs[0].id:null;
   return s;
@@ -561,7 +567,7 @@ const ICON_MIC='<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11"
 /* ================= Daten ================= */
 const KEY='woerter-sammler-v1';
 function newLang(name){
-  return {id:uid(),name,dir:'mix',sessionSize:10,goal:100,packSize:3,ppr:10,speechLang:'auto',points:0,totalPoints:0,packs:0,vocab:[],cards:[],owned:{},wins:[],log:{}};
+  return {id:uid(),name,dir:'mix',sessionSize:10,goal:100,packSize:3,ppr:10,speechLang:'auto',points:0,totalPoints:0,packs:0,sp:[],vocab:[],cards:[],owned:{},wins:[],log:{}};
 }
 function seed(){
   const L=newLang('Englisch');
@@ -711,7 +717,7 @@ const HELP={
     'Im Album erscheinen sie als besondere Karten.']],
   streak:['Serien-Belohnung',[
     'Länge einer Serie: Nach so vielen Tagen in Folge gibt es die Belohnung.',
-    'Belohnung: Standard-Belohnung bei jeder abgeschlossenen Serie, Päckchen oder spezielle Belohnung.',
+    'Belohnung: Päckchen, Big-Pack (5 Karten), Mega-Pack (7 Karten), Epic-Pack (3 epische Karten), Legend-Pack (1 legendäre Karte) oder eine spezielle Belohnung.',
     'Nächste Serie: Eine eigene Belohnung, die einmalig die Standard-Belohnung ersetzt.',
     'Die Belohnung geht an die Sprache, mit der zuletzt geübt wurde.']],
   pomo:['Lernpause',[
@@ -756,6 +762,7 @@ function langTabs(){
   if(!S.langs.length) return '';
   return `<div class="chips" role="tablist">${S.langs.map(l=>`<button class="chip ${l.id===curLang().id?'on':''}" data-a="lang" data-id="${l.id}">${esc(l.name)}</button>`).join('')}</div>`;
 }
+const packCount=L=>(L.packs||0)+((L.sp||[]).length);
 function streakNow(){const s=S.streak;if(!s||!s.last)return 0;return (s.last===dateKey(0)||s.last===dateKey(-1))?s.count:0;}
 
 function catDrop(key,sel,units,allLabel){
@@ -772,18 +779,18 @@ function vHome(){
   const pool=ui.unit.length?L.vocab.filter(w=>ui.unit.includes(w.unit)).length:total;
   const n=Math.min(L.sessionSize,pool);
   const pct=Math.min(100,Math.round(L.points/L.goal*100));
-  const st=streakNow(),nextT=(S.streakCfg.def.active||S.streakCfg.nextRid)?nextStreakTarget(st,S.streakCfg.days):0;
+  const st=streakNow(),nextT=(S.streakCfg.def.active||S.streakCfg.nextRid||S.streakCfg.nextPack)?nextStreakTarget(st,S.streakCfg.days):0;
   return `${langChips()}
   <div class="panel">
     <div class="packbox">
-      <div class="packimg">${packPic()}${L.packs>0?`<span class="badge">${L.packs}</span>`:''}</div>
+      <div class="packimg">${packPic()}${packCount(L)>0?`<span class="badge">${packCount(L)}</span>`:''}</div>
       <div class="grow">
-        <h3>${L.packs>0?(L.packs===1?'1 Päckchen wartet!':L.packs+' Päckchen warten!'):'Nächstes Päckchen'}</h3>
+        <h3>${packCount(L)>0?(packCount(L)===1?'1 Päckchen wartet!':packCount(L)+' Päckchen warten!'):'Nächstes Päckchen'}</h3>
         <div class="bar gold" aria-label="Fortschritt"><i style="width:${pct}%"></i></div>
         <p class="note" style="margin:6px 0 0">Noch ${L.goal-L.points} Punkte bis zum nächsten Päckchen</p>
       </div>
     </div>
-    ${L.packs>0?`<button class="btn gold block" style="margin-top:12px" data-a="open-pack">Päckchen öffnen</button>`:''}
+    ${packCount(L)>0?`<button class="btn gold block" style="margin-top:12px" data-a="open-pack">Päckchen öffnen</button>`:''}
   </div>
   <div class="panel ${st>0?'streak':''}"><div class="row" style="flex-wrap:nowrap"><span class="flame" style="${st>0?'':'color:var(--muted);filter:none'}">${ICON_FLAME}</span><div class="grow"><b>${st>0?`Du hast ${st} ${st===1?'Tag':'Tage'} hintereinander Vokabeln gelernt!`:'Starte heute eine neue Serie!'}</b>${st>0&&nextT?`<div class="note">Nächste Serien-Belohnung nach ${nextT} Tagen</div>`:''}</div></div></div>
   ${total?`
@@ -915,8 +922,8 @@ function vSummary(){
   ${Q.packs?`<div class="packimg" style="margin:6px auto 12px">${packPic()}<span class="badge">${Q.packs}</span></div><p><b>${Q.packs===1?'Du hast ein neues Päckchen verdient!':'Du hast '+Q.packs+' neue Päckchen verdient!'}</b></p>`:''}
   <div class="bar gold" style="margin:12px 0 6px"><i style="width:${pct}%"></i></div>
   <p class="note">Noch ${L.goal-L.points} Punkte bis zum nächsten Päckchen</p></div>
-  ${Q.streakAwards&&Q.streakAwards.length?`<div class="panel center"><h3>Serien-Belohnung!</h3>${Q.streakAwards.map(a=>`<p style="margin:4px 0"><b>${a.days} Tage in Folge:</b> ${a.kind==='pack'?(a.packs===1?'1 Päckchen':a.packs+' Päckchen'):esc(a.text)}</p>`).join('')}</div>`:''}
-  ${L.packs>0?`<button class="btn gold block" data-a="open-pack">Päckchen öffnen (${L.packs})</button>`:''}
+  ${Q.streakAwards&&Q.streakAwards.length?`<div class="panel center"><h3>Serien-Belohnung!</h3>${Q.streakAwards.map(a=>`<p style="margin:4px 0"><b>${a.days} Tage in Folge:</b> ${a.kind==='pack'?(a.label?(a.packs===1?a.label:a.packs+'× '+a.label):(a.packs===1?'1 Päckchen':a.packs+' Päckchen')):esc(a.text)}</p>`).join('')}</div>`:''}
+  ${packCount(L)>0?`<button class="btn gold block" data-a="open-pack">Päckchen öffnen (${packCount(L)})</button>`:''}
   <div class="row" style="margin-top:10px"><button class="btn block grow" data-a="start">Nochmal</button><button class="btn primary block grow" data-a="nav" data-v="home">Fertig</button></div>`;
 }
 
@@ -927,14 +934,14 @@ function cardFace(c,isNew,count){
 }
 function packActions(){
   const P=ui.pack,L=curLang(),all=P.items.every(i=>i.on);
-  return all?`<div class="row" style="margin-top:6px">${L.packs>0?`<button class="btn gold grow" data-a="open-pack">Nächstes Päckchen (${L.packs})</button>`:''}<button class="btn primary grow" data-a="nav" data-v="album">Zum Album</button></div>`
+  return all?`<div class="row" style="margin-top:6px">${packCount(L)>0?`<button class="btn gold grow" data-a="open-pack">Nächstes Päckchen (${packCount(L)})</button>`:''}<button class="btn primary grow" data-a="nav" data-v="album">Zum Album</button></div>`
   :`<button class="btn block" data-a="flip-all">Alle aufdecken</button>`;
 }
 function vPack(){
   const P=ui.pack,all=P.items.every(i=>i.on);
-  if(!P.opened) return `<h2 class="center">Dein Päckchen</h2><p class="center muted">Tippe aufs Päckchen, um es zu öffnen.</p>
+  if(!P.opened) return `<h2 class="center">Dein ${esc(P.name||'Päckchen')}</h2><p class="center muted">Tippe aufs Päckchen, um es zu öffnen.</p>
   <button class="packbig" data-a="tear" aria-label="Päckchen öffnen">${packPic()}</button>`;
-  return `<h2 class="center">Dein Päckchen</h2><p class="center muted" id="packhint">${all?'Das sind deine neuen Karten!':'Tippe auf die Karten zum Aufdecken.'}</p>
+  return `<h2 class="center">Dein ${esc(P.name||'Päckchen')}</h2><p class="center muted" id="packhint">${all?'Das sind deine neuen Karten!':'Tippe auf die Karten zum Aufdecken.'}</p>
   <div class="packgrid">${P.items.map((it,i)=>`<button class="flip ${it.on?'on':''} ${it.card.kind==='reward'||it.card.rarity==='e'||it.card.rarity==='l'?'hi':''}" data-a="flip" data-i="${i}" aria-label="Karte ${i+1}"><div class="flip-in"><div class="face back" style="background:url(backs/${S.cardBack}.svg) center/cover no-repeat"></div><div class="face front">${cardFace(it.card,it.isNew)}</div></div></button>`).join('')}</div>
   <div id="packact">${packActions()}</div>`;
 }
@@ -1069,12 +1076,12 @@ function pStreak(){
   <div class="field"><label for="sc-days">Länge einer Serie in Tagen</label><input id="sc-days" class="in" type="number" inputmode="numeric" min="1" max="365" value="${c.days}" data-change="scfg" data-k="days"></div>
   <h3 style="margin-top:14px">Standard-Belohnung</h3>
   <div class="urow"><div class="t"><b>Nach jeder Serie</b></div><button class="tog ${d.active?'on':''}" data-a="toggle-sdef">${d.active?'Aktiv':'Aus'}</button></div>
-  <div class="field"><label for="sc-kind">Belohnung</label><select id="sc-kind" class="in" data-change="scfg" data-k="kind"><option value="pack" ${d.kind==='pack'?'selected':''}>Päckchen</option><option value="text" ${d.kind==='text'?'selected':''}>Spezielle Belohnung</option></select></div>
-  ${d.kind==='pack'?`<div class="field"><label for="sc-packs">Anzahl Päckchen</label><input id="sc-packs" class="in" type="number" inputmode="numeric" min="1" max="10" value="${d.packs}" data-change="scfg" data-k="packs"></div>`
+  <div class="field"><label for="sc-kind">Belohnung</label><select id="sc-kind" class="in" data-change="scfg" data-k="kind"><option value="pack" ${d.kind==='pack'?'selected':''}>Päckchen</option><option value="big" ${d.kind==='big'?'selected':''}>${SPECIAL_PACKS.big.name} (${SPECIAL_PACKS.big.desc})</option><option value="mega" ${d.kind==='mega'?'selected':''}>${SPECIAL_PACKS.mega.name} (${SPECIAL_PACKS.mega.desc})</option><option value="epic" ${d.kind==='epic'?'selected':''}>${SPECIAL_PACKS.epic.name} (${SPECIAL_PACKS.epic.desc})</option><option value="legend" ${d.kind==='legend'?'selected':''}>${SPECIAL_PACKS.legend.name} (${SPECIAL_PACKS.legend.desc})</option><option value="text" ${d.kind==='text'?'selected':''}>Spezielle Belohnung</option></select></div>
+  ${d.kind!=='text'?`<div class="field"><label for="sc-packs">Anzahl</label><input id="sc-packs" class="in" type="number" inputmode="numeric" min="1" max="10" value="${d.packs}" data-change="scfg" data-k="packs"></div>`
    :`<div class="field"><label for="sc-rid">Spezielle Belohnung</label><select id="sc-rid" class="in" data-change="scfg" data-k="rid">${rewardOpts(d.rid)}</select></div>${S.rewards.length?'':'<p class="muted">Lege erst unter „Spezielle Belohnungen“ eine an.</p>'}`}
   <h3 style="margin-top:18px">Für die nächste Serie</h3>
   <p class="note">Ersetzt die Standard-Belohnung einmalig. Danach gilt wieder die Standard-Belohnung.</p>
-  <div class="field"><label for="sc-next">Spezielle Belohnung</label><select id="sc-next" class="in" data-change="scfg" data-k="next">${rewardOpts(c.nextRid)}</select></div>
+  <div class="field"><label for="sc-next">Belohnung</label><select id="sc-next" class="in" data-change="scfg" data-k="next"><option value="">– keine –</option><optgroup label="Päckchen">${Object.keys(SPECIAL_PACKS).map(k=>`<option value="pack:${k}" ${c.nextPack===k?'selected':''}>${SPECIAL_PACKS[k].name} (${SPECIAL_PACKS[k].desc})</option>`).join('')}</optgroup><optgroup label="Spezielle Belohnung">${S.rewards.map(r=>`<option value="${r.id}" ${r.id===c.nextRid?'selected':''}>${esc(r.text)}${r.active?'':' (pausiert)'}</option>`).join('')}</optgroup></select></div>
   </div>`;
 }
 function pReward(L){
@@ -1303,9 +1310,11 @@ function finishQuiz(){
     if(streakDue(s.count,c.days)){
       const sp=c.nextRid&&S.rewards.find(r=>r.id===c.nextRid);
       let g=null;
-      if(sp)g={kind:'text',rid:sp.id};else if(c.def.active)g=c.def.kind==='text'?(S.rewards.find(r=>r.id===c.def.rid)?{kind:'text',rid:c.def.rid}:null):{kind:'pack'};
-      if(sp)c.nextRid='';
-      if(g&&g.kind==='pack'){const n=c.def.packs||1;L.packs+=n;Q.streakAwards.push({kind:'pack',packs:n,days:s.count});}
+      if(c.nextPack)g={kind:'pack',t:c.nextPack,n:1};
+      else if(sp)g={kind:'text',rid:sp.id};
+      else if(c.def.active)g=c.def.kind==='text'?(S.rewards.find(r=>r.id===c.def.rid)?{kind:'text',rid:c.def.rid}:null):{kind:'pack',t:SPECIAL_PACKS[c.def.kind]?c.def.kind:'',n:c.def.packs||1};
+      if(sp||c.nextPack){c.nextRid='';c.nextPack='';}
+      if(g&&g.kind==='pack'){const n=g.n||1;if(g.t){for(let i=0;i<n;i++)L.sp.push(g.t);}else L.packs+=n;Q.streakAwards.push({kind:'pack',packs:n,label:g.t?SPECIAL_PACKS[g.t].name:'',days:s.count});}
       else if(g){const r=S.rewards.find(x=>x.id===g.rid);L.wins.push({id:uid(),rid:r.id,text:r.text,rarity:r.rarity,src:'streak',days:s.count,ts:Date.now(),redeemed:false});if(r.once)r.active=false;Q.streakAwards.push({kind:'text',text:r.text,days:s.count});}
     }
   }
@@ -1333,11 +1342,12 @@ function startListen(){
 
 /* ================= Päckchen ================= */
 function openPack(){
-  const L=curLang();if(!L||L.packs<1)return;
+  const L=curLang();if(!L||packCount(L)<1)return;
   const pool=L.cards.concat(rewardsFor(L));
   if(!pool.length){toast('Noch keine Karten im Album. Bitte Mama oder Papa fragen.');return;}
-  const drawn=drawCards(pool,L.packSize);
-  L.packs--;
+  const t=(L.sp||[]).length?L.sp.shift():'';
+  const drawn=t?packDraw(t,pool):drawCards(pool,L.packSize);
+  if(!t)L.packs--;
   const items=drawn.map(c=>{
     if(c.kind==='reward'){
       L.wins.push({id:uid(),rid:c.id,text:c.text,rarity:c.rarity,ts:Date.now(),redeemed:false});
@@ -1346,7 +1356,7 @@ function openPack(){
     }
     const isNew=!(L.owned[c.id]>0);L.owned[c.id]=(L.owned[c.id]||0)+1;return {card:c,isNew,on:false};
   });
-  save();ui.pack={items,opened:false};ui.view='pack';render();
+  save();ui.pack={items,opened:false,name:t?SPECIAL_PACKS[t].name:'Päckchen'};ui.view='pack';render();
 }
 
 /* ================= Sicherung ================= */
@@ -1608,10 +1618,10 @@ document.addEventListener('change',async e=>{
   else if(k==='scfg'){
     const c=S.streakCfg,key=el.dataset.k;
     if(key==='days')c.days=clamp(el.value,1,365);
-    else if(key==='kind')c.def.kind=el.value==='text'?'text':'pack';
+    else if(key==='kind')c.def.kind=(el.value==='text'||SPECIAL_PACKS[el.value])?el.value:'pack';
     else if(key==='packs')c.def.packs=clamp(el.value,1,10);
     else if(key==='rid')c.def.rid=el.value;
-    else if(key==='next')c.nextRid=el.value;
+    else if(key==='next'){const v=el.value;if(v.startsWith('pack:')){c.nextPack=SPECIAL_PACKS[v.slice(5)]?v.slice(5):'';c.nextRid='';}else{c.nextRid=v;c.nextPack='';}}
     save();render();
   }
   else if(k==='packimg'){
