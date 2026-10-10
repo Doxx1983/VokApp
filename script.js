@@ -1047,7 +1047,7 @@ function vOptions(){
   <button class="icon-btn" data-a="back-step" data-d="1" aria-label="Weiter">›</button></div>
   <p class="note center">Wische oder tippe auf ‹ ›. So sehen die Karten im Päckchen aus, bevor sie aufgedeckt werden.</p></div>`;
 }
-function confetti(n){
+function confetti(n){try{
   if(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches)return;
   const cols=['var(--gold)','var(--accent)','var(--accent-2)','var(--streak)'];
   for(let i=0;i<(n||28);i++){const e=document.createElement('i');e.className='conf';
@@ -1057,7 +1057,7 @@ function confetti(n){
     e.style.setProperty('--rot',(Math.random()*720-360)+'deg');
     e.style.animationDelay=(Math.random()*.15)+'s';
     document.body.appendChild(e);setTimeout(()=>e.remove(),1700);}
-}
+}catch(_){}}
 function render(){
   applyTheme();
   let h='';
@@ -1305,7 +1305,7 @@ document.addEventListener('click',async e=>{
       const v=val('#ans');render();const a=$('#ans');if(a){a.value=v;a.focus();}break;}
     case 'next':nextQuestion();break;
     case 'open-pack':openPack();break;
-    case 'tear':{if(navigator.vibrate)navigator.vibrate(30);el.classList.add('tearing');setTimeout(()=>{ui.pack.opened=true;render();},matchMedia('(prefers-reduced-motion:reduce)').matches?0:420);break;}
+    case 'tear':{if(navigator.vibrate)navigator.vibrate(30);const go=()=>{ui.pack.opened=true;render();};if(window.matchMedia&&!matchMedia('(prefers-reduced-motion:reduce)').matches){el.classList.add('tearing');setTimeout(go,420);}else go();break;}
     case 'flip':{
       const it=ui.pack.items[+d.i];if(it.on)break;
       it.on=true;el.classList.add('on');
