@@ -20,14 +20,13 @@ where = wo
 when = wann
 why = warum
 how = wie
-how many = wie viele
 I = ich
 you = du / ihr
 he = er
 she = sie
 we = wir
 they = sie
-# Familie & Freunde
+# Familie 1
 mother = Mutter
 father = Vater
 sister = Schwester
@@ -68,11 +67,9 @@ hungry = hungrig
 thirsty = durstig
 scared = ängstlich
 excited = aufgeregt
-bored = gelangweilt
-proud = stolz
 sick = krank
 fine = gut / in Ordnung
-# Haustiere & Bauernhof
+# Haustiere 1
 dog = Hund
 cat = Katze
 mouse = Maus
@@ -80,30 +77,26 @@ rabbit = Kaninchen
 bird = Vogel
 fish = Fisch
 hamster = Hamster
+guinea pig = Meerschweinchen
+# Tiere 1
 horse = Pferd
 cow = Kuh
 pig = Schwein
 sheep = Schaf
 chicken = Huhn
 duck = Ente
-goat = Ziege
-# Wilde Tiere
 lion = Löwe
 elephant = Elefant
 monkey = Affe
 giraffe = Giraffe
 tiger = Tiger
 bear = Bär
-wolf = Wolf
-fox = Fuchs
 snake = Schlange
 frog = Frosch
 spider = Spinne
 butterfly = Schmetterling
 dolphin = Delfin
-shark = Hai
 whale = Wal
-turtle = Schildkröte
 # Farben
 red = rot
 blue = blau
@@ -116,7 +109,6 @@ black = schwarz
 white = weiß
 brown = braun
 grey = grau
-gold = gold
 # Zahlen
 one = eins
 two = zwei
@@ -131,9 +123,7 @@ ten = zehn
 eleven = elf
 twelve = zwölf
 twenty = zwanzig
-fifty = fünfzig
 one hundred = hundert
-first = erste
 # Essen & Trinken
 bread = Brot
 butter = Butter
@@ -155,7 +145,7 @@ meat = Fleisch
 breakfast = Frühstück
 lunch = Mittagessen
 dinner = Abendessen
-# Obst & Gemüse
+# Früchte 1
 apple = Apfel
 banana = Banane
 orange (fruit) = Orange
@@ -165,14 +155,18 @@ pear = Birne
 cherry = Kirsche
 lemon = Zitrone
 watermelon = Wassermelone
+peach = Pfirsich
+pineapple = Ananas
+raspberry = Himbeere
+plum = Pflaume
+# Gemüse
 tomato = Tomate
 potato = Kartoffel
 carrot = Karotte
 cucumber = Gurke
 onion = Zwiebel
 salad = Salat
-corn = Mais
-# Kleidung
+# Kleidung 1
 shirt = Hemd / T-Shirt
 trousers = Hose
 jeans = Jeans
@@ -187,6 +181,16 @@ hat = Hut / Mütze
 scarf = Schal
 gloves = Handschuhe
 boots = Stiefel
+# Möbel 1
+table = Tisch
+chair = Stuhl
+bed = Bett
+sofa = Sofa
+wardrobe = Kleiderschrank
+shelf = Regal
+mirror = Spiegel
+carpet = Teppich
+lamp = Lampe
 # Zuhause
 house = Haus
 room = Zimmer
@@ -197,12 +201,7 @@ living room = Wohnzimmer
 garden = Garten
 door = Tür
 window = Fenster
-table = Tisch
-chair = Stuhl
-bed = Bett
-sofa = Sofa
-television = Fernseher
-# Schule
+# Schule 1
 school = Schule
 teacher = Lehrer / Lehrerin
 classroom = Klassenzimmer
@@ -217,6 +216,18 @@ desk = Schulbank / Schreibtisch
 homework = Hausaufgaben
 lesson = Unterrichtsstunde
 break = Pause
+# Schulfächer
+maths = Mathe
+English = Englisch
+German = Deutsch
+art = Kunst
+music (lesson) = Musik
+PE = Sport
+science = Sachunterricht / Naturwissenschaften
+history = Geschichte
+geography = Erdkunde
+religion = Religion
+computing = Informatik
 # Wetter & Jahreszeiten
 weather = Wetter
 sun = Sonne
@@ -224,7 +235,6 @@ rain = Regen
 snow = Schnee
 wind = Wind
 cloud = Wolke
-storm = Sturm
 warm = warm
 spring = Frühling
 summer = Sommer
@@ -269,31 +279,25 @@ hospital = Krankenhaus
 play = spielen
 game = Spiel
 toy = Spielzeug
-doll = Puppe
 ball = Ball
 football = Fußball
-swimming = Schwimmen
 music = Musik
-song = Lied
 dance = tanzen / Tanz
-film = Film
 birthday = Geburtstag
 present = Geschenk
 party = Party
 # Natur
 tree = Baum
 flower = Blume
-grass = Gras
 forest = Wald
 mountain = Berg
 river = Fluss
-lake = See
 sea = Meer
 beach = Strand
 sky = Himmel
 moon = Mond
 star = Stern
-# Verben
+# Verben 1
 to be = sein
 to have = haben
 to go = gehen
@@ -337,5 +341,4 @@ difficult = schwierig
 beautiful = schön
 funny = lustig
 loud = laut
-quiet = leise
 clean = sauber

@@ -34,6 +34,8 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 - Sync zwischen zwei Handys: nicht gebaut (bräuchte Cloud-Backend), „aktuell nicht“.
 - Karten-Pack-Bild (urheberrechtlich) ist nicht im Repo; wird vom Nutzer hochgeladen.
 
-## Vokabel-Kategorien (docs/englisch-320-vokabeln.txt, 320 Wörter, britisches Englisch)
-Begrüßung & Höflichkeit (14) · Fragewörter & kleine Wörter (13) · Familie & Freunde (16) · Körper (14) · Gefühle (12) · Haustiere & Bauernhof (14) · Wilde Tiere (16) · Farben (12) · Zahlen (16) · Essen & Trinken (20) · Obst & Gemüse (16) · Kleidung (14) · Zuhause (14) · Schule (14) · Wetter & Jahreszeiten (12) · Tage & Monate (19) · Stadt & Verkehr (14) · Spiel & Sport (14) · Natur (12) · Verben (24) · Adjektive & Gegensätze (20).
-Import: Elternbereich → Einzelne Sprache → Englisch → Vokabeln → gesamten Dateiinhalt einfügen → „Hinzufügen“. Gleiche Kategorienamen werden zusammengeführt, identische Paare übersprungen.
+## Vokabel-Kategorien
+Bestehende Kategorien des Nutzers in der App (exakt so benannt, inkl. „ 1“): Möbel 1, Früchte 1, Kleidung 1, Haustiere 1, Tiere 1, Schule 1, Verben 1, Familie 1. Gewünscht zusätzlich: Schulfächer.
+`docs/englisch-320-vokabeln.txt` (320 Wörter, britisches Englisch) nutzt diese Namen, damit die Wörter zusammengeführt werden. Weitere Kategorien: Begrüßung & Höflichkeit (14), Fragewörter & kleine Wörter (12), Körper (14), Gefühle (10), Farben (11), Zahlen (14), Essen & Trinken (20), Gemüse (6), Zuhause (9), Wetter & Jahreszeiten (11), Tage & Monate (19), Stadt & Verkehr (14), Spiel & Sport (10), Natur (10), Adjektive & Gegensätze (19).
+Zugeordnet: Familie 1 (16), Haustiere 1 (8), Tiere 1 (18, Bauernhof + wilde Tiere), Früchte 1 (13), Kleidung 1 (14), Möbel 1 (9), Schule 1 (14), Schulfächer (11), Verben 1 (24).
+Import: Elternbereich → Einzelne Sprache → Englisch → Vokabeln → gesamten Dateiinhalt einfügen → „Hinzufügen“. Identische Paare in derselben Kategorie werden übersprungen.
