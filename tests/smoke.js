@@ -115,7 +115,7 @@ const test=`
  await click({a:'theme',k:'rot'});assert.equal(S.theme,'rot');assert(document.documentElement.style.props['--accent'].startsWith('hsl(4'));assert(!ui.themeOpen);
  await click({a:'theme',k:'lila'});assert.equal(document.documentElement.style.props['--bg'],'#13112a');
  await click({a:'theme',k:'schwarz'});assert.equal(document.documentElement.style.props['--bg'],'#0b0b0c');
- await click({a:'back',n:'4'});assert.equal(curLang().back,4);assert(app().includes('✓ Feuer'));await click({a:'back-step',d:'-1'});assert.equal(curLang().back,3);curLang().back=10;await click({a:'back-step',d:'1'});assert.equal(curLang().back,1,'umlaufend');
+ ui.view='parent';ui.unlocked=true;ui.sec='backs';render();await click({a:'back',n:'4'});assert.equal(curLang().back,4);assert(app().includes('✓ Feuer'));await click({a:'back-step',d:'-1'});assert.equal(curLang().back,3);curLang().back=10;await click({a:'back-step',d:'1'});assert.equal(curLang().back,1,'umlaufend');
  S.customBacks.push({id:'ctest',name:'Eigener Rücken 1'});await click({a:'back',n:'ctest'});assert.equal(curLang().back,'ctest');assert(app().includes('✓ Eigener Rücken 1'));
  await click({a:'back-step',d:'1'});assert.equal(curLang().back,1,'umlaufend nach eigenen');
  await click({a:'back',n:'ctest'});await click({a:'del-back',key:'del-back:ctest'});await click({a:'del-back',key:'del-back:ctest'});assert.equal(S.customBacks.length,0);assert(curLang().back==null,'Verweis entfernt');
@@ -203,7 +203,7 @@ const test=`
   // Hilfe in jedem Bereich
   for(const v of ['home','list','album','stats','options']){await click({a:'nav',v});await click({a:'help',k:v});assert(ui.modal&&ui.modal.t==='help'&&app().includes('helplist'),'Hilfe '+v);await click({a:'close-modal'});assert(!ui.modal);}
   for(const k of Object.keys(HELP)){await click({a:'help',k});assert(app().includes(esc(HELP[k][0])),'Hilfetext '+k);await click({a:'close-modal'});}
-  ui.view='parent';ui.unlocked=true;for(const k of ['lang','vocab','cards','prizes','streak','pomo','reward','backup']){ui.sec=k;render();assert(app().includes('data-k="'+k+'"'),'Sektionshilfe '+k);}
+  ui.view='parent';ui.unlocked=true;for(const k of ['lang','vocab','cards','prizes','backs','streak','pomo','reward','backup']){ui.sec=k;render();assert(app().includes('data-k="'+k+'"'),'Sektionshilfe '+k);}
   ui.unlocked=false;ui.view='home';render();
   // Geltungsbereich Elternbereich
   ui.view='parent';ui.unlocked=true;ui.sec='reward';render();assert(app().includes('data-a="pscope"')&&app().includes('catdrop'),'Dropdown bei Einzelsprache');
