@@ -100,6 +100,7 @@ textarea.in{resize:vertical;min-height:120px}
 .tog.on{background:var(--good-bg);color:var(--good)}
 /* Lernen */
 .qtop{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+.helprow{display:flex;justify-content:flex-end;margin:0 0 6px}.helprow.in{margin:6px 4px 0}.helpb{padding:4px 12px}.helplist{margin:8px 0 14px;padding-left:20px;line-height:1.45}.helplist li{margin:0 0 8px}
 .icon-btn{appearance:none;border:0;background:var(--surface);color:var(--ink);width:44px;height:44px;border-radius:12px;font-size:20px;font-weight:900;cursor:pointer;box-shadow:var(--shadow);flex:none}
 .qcard{background:var(--surface);border-radius:22px;padding:26px 18px;text-align:center;box-shadow:var(--shadow);margin-bottom:14px}
 .qlabel{font-size:14px;font-weight:800;color:var(--muted);margin-bottom:8px}
@@ -636,6 +637,98 @@ function starterBlob(emoji,color){
 const ui={view:'home',selMode:false,cardSel:[],setupErr:'',lockErr:'',lockPin:false,sm:'p',sg:'d',unit:[],catOpen:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
 let Q=null,deferredInstall=null,confirmT,rec=null;
 
+/* ================= Hilfe ================= */
+const HELP={
+  home:['Lernen',[
+    'Sprache: Oben wählst du die Sprache. Jede Sprache hat eigene Punkte, Karten und Päckchen.',
+    'Päckchen: Sammle Punkte beim Lernen. Ist das Punkteziel erreicht, kannst du ein Päckchen öffnen und bekommst Karten für dein Album.',
+    'Serie: Zeigt, an wie vielen Tagen hintereinander du gelernt hast. Bei aktiver Serie leuchtet der Start-Button. Erreichst du ein Serienziel, wartet eine Belohnung.',
+    'Kategorien: Wähle eine oder mehrere Kategorien aus, oder lass „Alle Kategorien“ stehen.',
+    'Schreiben / Sprechen: Beim Schreiben tippst du die Antwort, beim Sprechen sagst du sie laut (braucht Mikrofon).',
+    '10 / 20 / 30: So viele Wörter hat eine Lerneinheit.',
+    'Lernen starten: Beginnt die Runde. Falsche Wörter kommen öfter wieder, gewusste seltener.',
+    'Pause: Nach einigen Runden erscheint „Mach mal Pause!“. Mit dem Eltern-PIN lässt sie sich vorzeitig beenden.']],
+  quiz:['Lernrunde',[
+    'Lies das Wort oben und gib die Übersetzung ein. Mit „Prüfen“ siehst du, ob es stimmt.',
+    'Kleine Tippfehler werden erkannt und als richtig gewertet.',
+    'Falsche Wörter kommen in der Runde noch einmal vor.',
+    'Richtige Antworten bringen Punkte für das nächste Päckchen.']],
+  list:['Vokabeln',[
+    'Hier siehst du alle Wörter der gewählten Sprache.',
+    'Kategorien: Mit dem Auswahlfeld filterst du die Liste (mehrere möglich).',
+    'Sortieren: Tippe auf eine Spaltenüberschrift. Nochmal tippen dreht die Reihenfolge um.',
+    'Die Liste dient zum Nachschlagen und Üben. Bearbeiten können nur die Eltern im Elternbereich.']],
+  album:['Album',[
+    'Hier siehst du alle Karten der Sprache. Gesammelte Karten sind bunt, fehlende dunkel.',
+    'Tippe auf eine Karte, um sie groß zu sehen.',
+    'Oben steht, wie viele Karten du schon hast.',
+    'Fehlen Bilder, können die Eltern sie im Elternbereich unter „Karten“ wiederherstellen.']],
+  stats:['Statistik',[
+    'Kennzahlen: Wörter gesamt, gewusst, noch zu lernen und neu.',
+    'Diagramme: Punkte und Lernzeit pro Tag oder pro Woche.',
+    'Woche und Monat: Die Woche geht von Montag bis Sonntag, der Monat ist der Kalendermonat.',
+    'Serie: Aktive Serien sind hervorgehoben.',
+    'Jede Sprache hat ihre eigene Statistik.']],
+  options:['Optionen',[
+    'Farbschema: Wähle in der Liste deine Lieblingsfarbe. Es gibt dunkle und helle („hell“) Varianten.',
+    'Kartenrücken: Wische oder tippe auf ‹ ›, und tippe auf einen Rücken, um ihn zu wählen. So sehen Karten im Päckchen aus.',
+    'Einstellungen gelten für dieses Gerät.']],
+  parent:['Elternbereich',[
+    'Der Bereich ist mit einer PIN geschützt. „Sperren“ schließt ihn wieder.',
+    'Tippe auf einen Abschnitt, um ihn zu öffnen. Bei jedem Abschnitt gibt es eine eigene Hilfe.',
+    'Einmal im Monat sollte unter „Sicherung & PIN“ eine Sicherung gespeichert werden.']],
+  lang:['Sprachen',[
+    'Lege hier Sprachen an, z. B. „Französisch“.',
+    'Jede Sprache hat eigene Vokabeln, Punkte, Karten und Statistik.',
+    'Löschen entfernt die Sprache mit allen Daten. Dafür zweimal tippen.']],
+  vocab:['Vokabeln (Eltern)',[
+    'Füge Wörter ein, eine Zeile pro Wort im Format „Fremdwort = Deutsch“.',
+    'Kategorie: Wähle oder tippe eine Kategorie, damit Wörter gruppiert werden.',
+    'Unten siehst du die Kategorien und Wörter. Tippe ein Wort an, um es zu bearbeiten oder zu löschen.',
+    'Mehrere Übersetzungen können mit Komma getrennt werden.']],
+  cards:['Karten',[
+    'Bilder importieren: Aus der Galerie (mehrere auswählen) oder als ZIP-Datei mit vielen Bildern.',
+    'Dateiname = Kartenname. Erneutes Importieren gleicher Namen ergänzt fehlende Bilder.',
+    'Seltenheit: Wähle vor dem Import, wie selten die Karten sind.',
+    'Päckchenbild: Eigenes Bild für das Päckchen.',
+    'Doppelte zusammenführen: Fasst gleichnamige Karten zusammen.',
+    'Markieren: Wähle mehrere Karten aus und lösche sie gesammelt.',
+    'Karte antippen: Name, Seltenheit und Bild bearbeiten.']],
+  prizes:['Spezielle Belohnungen',[
+    'Lege eigene Belohnungen als Text an, z. B. „Eis essen“.',
+    'Sie können als Preise für Päckchen oder Serien verwendet werden.',
+    'Im Album erscheinen sie als besondere Karten.']],
+  streak:['Serien-Belohnung',[
+    'Länge einer Serie: Nach so vielen Tagen in Folge gibt es die Belohnung.',
+    'Belohnung: Standard-Belohnung bei jeder abgeschlossenen Serie, Päckchen oder spezielle Belohnung.',
+    'Nächste Serie: Eine eigene Belohnung, die einmalig die Standard-Belohnung ersetzt.',
+    'Die Belohnung geht an die Sprache, mit der zuletzt geübt wurde.']],
+  pomo:['Lernpause',[
+    'Nach der eingestellten Lernzeit sperrt die App nach der Runde für eine Pause („Mach mal Pause!“).',
+    'Lernzeit, Pausenlänge und Leerlauf-Zeit lassen sich einstellen.',
+    'Die Pause läuft mit Serverzeit weiter, auch wenn die App geschlossen ist.',
+    'Entsperren geht nur mit dem Eltern-PIN.',
+    'Testen: Mit dem Testknopf siehst du die Pause sofort.']],
+  reward:['Punkte & Abfrage',[
+    'Punkte pro Päckchen: So viele Punkte braucht man für ein Päckchen.',
+    'Punkte pro richtiger Antwort: Wie viele Punkte eine richtige Antwort bringt.',
+    'Karten pro Päckchen: Wie viele Karten ein Päckchen enthält.',
+    'Abfrage beim Schreiben: Richtung der Abfrage (Fremdwort → Deutsch, Deutsch → Fremdwort oder gemischt).',
+    'Spracherkennung: Sprache für den Sprechen-Modus, meist automatisch.',
+    '1 Päckchen schenken: Gibt der Sprache sofort ein Päckchen.']],
+  backup:['Sicherung & PIN',[
+    'App installieren: Legt die App als Symbol auf dem Startbildschirm an.',
+    'Sicherung speichern: Erstellt eine Datei mit Wörtern, Karten, Bildern und Fortschritt. Bitte regelmäßig machen und sicher aufbewahren.',
+    'Sicherung laden: Stellt eine Sicherung wieder her, z. B. nach Löschen der Browserdaten oder auf einem neuen Handy. Vorhandene Daten werden ersetzt.',
+    'PIN ändern: Neue PIN (4 bis 8 Ziffern) für Elternbereich und Pausen-Entsperrung.']]
+};
+function helpBtn(k){return `<button class="btn small helpb" data-a="help" data-k="${k}" aria-label="Hilfe">? Hilfe</button>`;}
+function helpModal(k){
+  const e=HELP[k]||HELP.home;
+  return `<div class="modal" data-a="backdrop"><div class="mbox"><h3>${esc(e[0])}</h3><ul class="helplist">${e[1].map(t=>{const i=t.indexOf(': ');return `<li>${i>0&&i<28?`<b>${esc(t.slice(0,i))}</b>: ${esc(t.slice(i+2))}`:esc(t)}</li>`;}).join('')}</ul>
+  <button class="btn primary block" data-a="close-modal">Schließen</button></div></div>`;
+}
+
 /* ================= Ansichten ================= */
 function langChips(){
   if(!S.langs.length) return '';
@@ -856,16 +949,17 @@ function vParent(){
   const L=curLang();
   let h=`<div class="row spread"><h2>Elternbereich</h2><button class="btn small" data-a="lock">Sperren</button></div>${langChips()}`;
   if(L&&(L.cards.length||L.vocab.length)&&(!S.lastBackup||Date.now()-S.lastBackup>14*864e5))h+=`<div class="busy">Die letzte Sicherung ist ${S.lastBackup?'älter als 14 Tage':'noch nicht gemacht'}. Bitte unter „Sicherung &amp; PIN“ eine Sicherung speichern, damit Karten und Fortschritt nicht verloren gehen.</div>`;
-  h+=secBtn('lang','Sprachen');if(ui.sec==='lang')h+=pLang();
-  h+=secBtn('vocab','Vokabeln');if(ui.sec==='vocab')h+=L?pVocab(L):noLang();
-  h+=secBtn('cards','Karten');if(ui.sec==='cards')h+=L?pCards(L):noLang();
-  h+=secBtn('prizes','Spezielle Belohnungen');if(ui.sec==='prizes')h+=L?pPrizes(L):noLang();
-  h+=secBtn('streak','Serien-Belohnung');if(ui.sec==='streak')h+=pStreak();
-  h+=secBtn('pomo','Lernpause');if(ui.sec==='pomo')h+=pPomo();
-  h+=secBtn('reward','Punkte &amp; Abfrage');if(ui.sec==='reward')h+=L?pReward(L):noLang();
-  h+=secBtn('backup','Sicherung &amp; PIN');if(ui.sec==='backup')h+=pBackup();
+  h+=secBtn('lang','Sprachen');if(ui.sec==='lang')h+=sh('lang')+pLang();
+  h+=secBtn('vocab','Vokabeln');if(ui.sec==='vocab')h+=sh('vocab')+(L?pVocab(L):noLang());
+  h+=secBtn('cards','Karten');if(ui.sec==='cards')h+=sh('cards')+(L?pCards(L):noLang());
+  h+=secBtn('prizes','Spezielle Belohnungen');if(ui.sec==='prizes')h+=sh('prizes')+(L?pPrizes(L):noLang());
+  h+=secBtn('streak','Serien-Belohnung');if(ui.sec==='streak')h+=sh('streak')+pStreak();
+  h+=secBtn('pomo','Lernpause');if(ui.sec==='pomo')h+=sh('pomo')+pPomo();
+  h+=secBtn('reward','Punkte &amp; Abfrage');if(ui.sec==='reward')h+=sh('reward')+(L?pReward(L):noLang());
+  h+=secBtn('backup','Sicherung &amp; PIN');if(ui.sec==='backup')h+=sh('backup')+pBackup();
   return h;
 }
+const sh=k=>`<div class="helprow in">${helpBtn(k)}</div>`;
 const noLang=()=>`<div class="secbody"><p class="muted">Lege zuerst unter „Sprachen“ eine Sprache an.</p></div>`;
 function pLang(){
   return `<div class="secbody"><div class="field"><label for="newlang">Neue Sprache</label><div class="row"><input id="newlang" class="in grow" placeholder="z. B. Französisch" maxlength="30"><button class="btn primary" data-a="add-lang">Anlegen</button></div></div>
@@ -985,6 +1079,7 @@ function pBackup(){
 }
 
 function vModal(){
+  if(ui.modal&&ui.modal.t==='help')return helpModal(ui.modal.k);
   const L=curLang(),m=ui.modal;if(!L)return '';
   const wrap=inner=>`<div class="modal" data-a="backdrop"><div class="mbox">${inner}</div></div>`;
   if(m.t==='word'){
@@ -1120,6 +1215,7 @@ function render(){
     case 'parent':h=vParent();break;
     default:h=vHome();
   }
+  if(ui.view!=='summary'&&ui.view!=='pack'&&!(ui.view==='parent'&&!ui.unlocked&&false))h=`<div class="helprow">${helpBtn(ui.view)}</div>`+h;
   $('#app').innerHTML=h+(ui.modal?vModal():'');
   document.body.classList.toggle('immersive',ui.view==='quiz'||ui.view==='pack');
   const tab=({album:'album',parent:'parent',options:'options',stats:'stats',list:'list'})[ui.view]||'home';
@@ -1361,6 +1457,7 @@ document.addEventListener('click',async e=>{
       $('#packact').innerHTML=packActions();$('#packhint').textContent='Das sind deine neuen Karten!';break;}
     case 'view-card':ui.modal={t:'view',id:d.id};render();break;
     case 'edit-card':ui.modal={t:'edit',id:d.id};render();break;
+    case 'help':ui.modal={t:'help',k:d.k};render();break;
     case 'close-modal':ui.modal=null;ui.confirm=null;render();break;
     case 'backdrop':if(e.target===el){ui.modal=null;ui.confirm=null;render();}break;
     case 'save-card':{
