@@ -196,7 +196,7 @@ nav button.on{color:var(--accent-text,var(--accent));background:var(--accent-sof
 .note{font-size:13px;color:var(--muted)}
 .busy{background:var(--warn-bg);color:var(--warn);border-radius:12px;padding:8px 12px;font-weight:800;margin:8px 0}
 .modal{position:fixed;inset:0;background:rgba(5,12,32,.74);display:grid;place-items:center;padding:16px;z-index:20;overflow-y:auto}
-.mbox{background:var(--surface);border-radius:20px;padding:18px;width:100%;max-width:340px}
+.mbox{max-height:calc(100dvh - 40px);overflow-y:auto;background:var(--surface);border-radius:20px;padding:18px;width:100%;max-width:340px}
 #lock{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;padding:24px}
 #lock[hidden]{display:none}
 .lockbox{width:min(420px,100%);text-align:center}
@@ -644,7 +644,7 @@ const HELP={
     'Sprache: Oben wählst du die Sprache im Auswahlfeld. Jede Sprache hat eigene Punkte, Karten und Päckchen.',
     'Päckchen: Sammle Punkte beim Lernen. Ist das Punkteziel erreicht, kannst du ein Päckchen öffnen und bekommst Karten für dein Album.',
     'Serie: Zeigt, an wie vielen Tagen hintereinander du gelernt hast. Bei aktiver Serie leuchtet der Start-Button. Erreichst du ein Serienziel, wartet eine Belohnung.',
-    'Kategorien: Wähle eine oder mehrere Kategorien aus, oder lass „Alle Kategorien“ stehen.',
+    'Kategorien: Wähle eine oder mehrere Kategorien aus, oder lass dich über „Alle Kategorien“ abfragen.',
     'Schreiben / Sprechen: Beim Schreiben tippst du die Antwort, beim Sprechen sagst du sie laut (braucht Mikrofon).',
     '10 / 20 / 30: So viele Wörter hat eine Lerneinheit.',
     'Lernen starten: Beginnt die Runde. Falsche Wörter kommen öfter wieder, gewusste seltener.',
