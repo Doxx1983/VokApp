@@ -470,6 +470,7 @@ function migrate(s){
   s.rewards=Array.isArray(s.rewards)?s.rewards:[];
   s.cardBack=Math.min(Math.max(Math.round(+s.cardBack)||1,1),BACKS.length);
   s.pomo=s.pomo&&typeof s.pomo==='object'&&+s.pomo.start?s.pomo:null;
+  if(s.pomo&&s.pomo.lock&&typeof s.pomo.left!=='number')s.pomo.left=300;
   s.streak=s.streak||{last:null,count:0};s.streak.best=Math.max(s.streak.best||0,s.streak.count||0);
   s.theme=THEME_DEFS.some(t=>t.k===s.theme)?s.theme:'blau';
   delete s.streakRewards;
@@ -516,15 +517,17 @@ function seriesWeeks(log,now,n){
 }
 function fmtDur(s){s=Math.round(s||0);if(s<60)return s+' Sek.';const m=Math.round(s/60);if(m<60)return m+' Min.';return Math.floor(m/60)+':'+String(m%60).padStart(2,'0')+' Std.';}
 /* Pomodoro: 25 Min. Lernzeit, dann 5 Min. gesperrte Pause. Pause nach Ende einer Runde > 5 Min. setzt den Timer zurück. */
-const POMO_WORK=25*60000,POMO_BREAK=5*60000,POMO_IDLE=5*60000;
-function pomoStep(p,now){
+const POMO_WORK=25*60000,POMO_BREAK_SEC=300,POMO_IDLE=5*60000;
+/* Lernzeit nutzt die Uhr; die Pause ist ein eigener Countdown (p.left in Sekunden) und beginnt erst, wenn keine Runde offen ist */
+function pomoStep(p,now,inQuiz){
   if(!p)return null;
-  if(p.lock)return now>=p.lock?null:p;
+  if(p.lock)return p;
   if(p.idle!=null&&now-p.idle>=POMO_IDLE)return null;
-  if(now-p.start>=POMO_WORK){const u=p.start+POMO_WORK+POMO_BREAK;return now>=u?null:{...p,lock:u};}
+  if(now-p.start>=POMO_WORK&&!inQuiz)return {...p,lock:true,left:POMO_BREAK_SEC};
   return p;
 }
-function pomoOnStart(p,now){p=pomoStep(p,now);return p?{...p,idle:null}:{start:now,idle:null};}
+function pomoCount(p,dt){return !p||!p.lock?p:(p.left-dt<=0?null:{...p,left:p.left-dt});}
+function pomoOnStart(p,now){p=pomoStep(p,now,false);if(p&&p.lock)return p;return p?{...p,idle:null}:{start:now,idle:null};}
 function pomoOnEnd(p,now){return p&&!p.lock?{...p,idle:now}:p;}
 //LOGIC-END
 
@@ -625,7 +628,7 @@ function starterBlob(emoji,color){
 }
 
 /* ================= Zustand der Oberfläche ================= */
-const ui={view:'home',sm:'p',sg:'d',unit:[],catOpen:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
+const ui={view:'home',setupErr:'',lockErr:'',lockPin:false,sm:'p',sg:'d',unit:[],catOpen:'',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
 let Q=null,deferredInstall=null,confirmT,rec=null;
 
 /* ================= Ansichten ================= */
@@ -1002,10 +1005,22 @@ let lastView=null;
 const THEME_PROPS=['--streak','--accent-text','--bg','--surface','--surface-2','--ink','--muted','--line','--accent','--accent-2','--accent-dark','--accent-ink','--accent-soft','--good','--good-bg','--bad','--bad-bg','--warn','--warn-bg','--shadow','color-scheme'];
 const POMO_HB='ws-pomo-hb';
 function renderLock(){
-  const el=$('#lock'),p=S.pomo,on=!!(p&&p.lock),app=$('#app'),nav=document.querySelector('nav');
+  const el=$('#lock'),p=S.pomo,setup=!S.pinHash,on=setup||!!(p&&p.lock),app=$('#app'),nav=document.querySelector('nav');
   if(app)app.inert=on;if(nav)nav.inert=on;
   if(!on){if(el)el.hidden=true;return;}
-  const left=Math.max(0,Math.ceil((p.lock-Date.now())/1000)),t=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');
+  if(setup){
+    const sig='s'+ui.setupErr;
+    if(el.hidden||el.dataset.sig!==sig){
+      el.hidden=false;el.dataset.sig=sig;
+      el.innerHTML=`<div class="lockbox" role="dialog" aria-labelledby="lt"><h1 id="lt">Willkommen!</h1><p class="muted">Eltern: Legt jetzt eine PIN fest (4 bis 8 Ziffern). Sie schützt den Elternbereich und die Lernpause.</p>
+      <div class="field"><input id="fp1" class="in ans" type="password" inputmode="numeric" maxlength="8" autocomplete="off" aria-label="PIN" placeholder="PIN"></div>
+      <div class="field"><input id="fp2" class="in ans" type="password" inputmode="numeric" maxlength="8" autocomplete="off" aria-label="PIN wiederholen" placeholder="PIN wiederholen"></div>
+      ${ui.setupErr?`<p class="err">${ui.setupErr}</p>`:''}<button class="btn primary block" data-a="pin-first">PIN festlegen</button></div>`;
+      const i=$('#fp1');if(i&&i.focus)i.focus();
+    }
+    return;
+  }
+  const left=Math.max(0,Math.ceil(p.left)),t=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');
   const sig=(ui.lockPin?'p':'b')+ui.lockErr;
   if(el.hidden||el.dataset.sig!==sig){
     el.hidden=false;el.dataset.sig=sig;
@@ -1015,19 +1030,20 @@ function renderLock(){
   const c=$('#lcount');if(c)c.textContent=t;
 }
 function endPause(){
-  const now=Date.now();
-  S.pomo=(ui.view==='quiz'&&Q)?{start:now,idle:null}:null;
-  if(Q)Q.t0=now;
-  ui.lockPin=false;ui.lockErr='';save();renderLock();render();
+  S.pomo=null;ui.lockPin=false;ui.lockErr='';save();renderLock();render();
 }
+let lastPerf=null,lastSave=0;
 function pomoTick(){
+  const pn=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+  const dt=lastPerf===null?0:Math.min(Math.max((pn-lastPerf)/1000,0),60);lastPerf=pn;
   const now=Date.now(),before=S.pomo,wasLocked=!!(before&&before.lock);
-  S.pomo=pomoStep(before,now);
-  const isLocked=!!(S.pomo&&S.pomo.lock);
-  if(S.pomo!==before){
-    if(wasLocked&&!isLocked&&ui.view==='quiz'&&Q){S.pomo={start:now,idle:null};Q.t0=now;}
-    save();
-    if(wasLocked&&!isLocked)render();
+  let p=pomoStep(before,now,ui.view==='quiz');
+  if(p&&p.lock)p=pomoCount(p,wasLocked?dt:0);
+  S.pomo=p;
+  const isLocked=!!(p&&p.lock);
+  if(p!==before){
+    if(wasLocked&&!isLocked){save();render();}
+    else if(!wasLocked||!isLocked||pn-lastSave>5000){save();lastSave=pn;}
   }
   if(isLocked&&!wasLocked){if(Q&&Q.listening)stopListen();ui.lockPin=false;ui.lockErr='';}
   renderLock();
@@ -1086,6 +1102,7 @@ function startQuiz(){
   const L=curLang();if(!L||!L.vocab.length)return;
   const ids=pickSession(L.vocab,ui.unit,L.sessionSize,Date.now());
   if(!ids.length){toast('Keine Wörter in dieser Liste');return;}
+  if(S.pomo&&S.pomo.lock)return;
   S.pomo=pomoOnStart(S.pomo,Date.now());
   const speak=S.mode==='speak';
   const dirOf=()=>speak?'d2f':(L.dir==='mix'?(Math.random()<.5?'f2d':'d2f'):L.dir);
@@ -1250,6 +1267,12 @@ document.addEventListener('click',async e=>{
     case 'start':startQuiz();break;
     case 'quit':stopListen();ui.view='home';render();break;
     case 'unlock':if(!S.pinHash){endPause();}else{ui.lockPin=true;ui.lockErr='';renderLock();}break;
+    case 'pin-first':{
+      const a=val('#fp1'),b=val('#fp2');
+      if(!/^\d{4,8}$/.test(a))ui.setupErr='Die PIN braucht 4 bis 8 Ziffern.';
+      else if(a!==b)ui.setupErr='Die beiden PINs sind verschieden.';
+      else{S.pinHash=hashPin(a);ui.setupErr='';save();render();}
+      renderLock();break;}
     case 'unlock-go':if(hashPin(val('#lpin'))===S.pinHash){endPause();}else{ui.lockErr='Falsche PIN.';renderLock();}break;
     case 'size':if(L){L.sessionSize=[10,20,30].includes(+d.n)?+d.n:10;save();render();}break;
     case 'sm':ui.sm=d.v;render();break;
@@ -1427,7 +1450,7 @@ document.addEventListener('input',e=>{
   if(k==='vtext')ui.vtext=e.target.value;else if(k==='vunit')ui.vunit=e.target.value;
 });
 document.addEventListener('keydown',e=>{
-  if(S.pomo&&S.pomo.lock){if(e.key==='Enter'){const b=document.querySelector('[data-a="unlock-go"]');if(b)b.click();}return;}
+  if(!S.pinHash||(S.pomo&&S.pomo.lock)){if(e.key==='Enter'){const b=document.querySelector('[data-a="unlock-go"],[data-a="pin-first"]');if(b)b.click();}return;}
   if(e.key!=='Enter')return;
   if(ui.view==='quiz'&&Q){
     if(Q.phase==='ask'&&Q.mode==='write'){e.preventDefault();const b=document.querySelector('[data-a="check"]');if(b)b.click();}
@@ -1435,6 +1458,8 @@ document.addEventListener('keydown',e=>{
   }
   else if(ui.view==='parent'&&!ui.unlocked){const b=document.querySelector('[data-a="pin-go"],[data-a="pin-set"]');if(b)b.click();}
 });
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save();});
+window.addEventListener('pagehide',()=>save());
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;});
 
 /* ================= Start ================= */
