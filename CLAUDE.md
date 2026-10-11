@@ -6,7 +6,7 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 ## Arbeitsweise
 - Antworten an Dominic: Deutsch, kurz und präzise.
 - Commit-Trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` und `Claude-Session: <Session-URL>`. Push: `git push -q origin main`.
-- Nach jeder Änderung: `sw.js` Cache-Version `woerter-sammler-vNN` erhöhen (aktuell v50), Tests laufen lassen, committen, pushen. Nutzer muss die App danach einmal neu laden.
+- Nach jeder Änderung: `sw.js` Cache-Version `woerter-sammler-vNN` erhöhen (aktuell v51), Tests laufen lassen, committen, pushen. Nutzer muss die App danach einmal neu laden.
 - Tests (Node, ohne Abhängigkeiten): `node tests/logic.test.js`, `tests/stats.test.js`, `tests/pomo.test.js`, `tests/sync.test.js`, `tests/smoke.js` (VM mit DOM-Stubs). `node --check` auf das extrahierte Script. Neue Features immer im Smoke-Test abdecken.
 - `pkill -f` nicht verwenden (beendet die eigene Shell).
 
@@ -17,6 +17,7 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 - Ansichten via `render()`: home, quiz, summary, pack, album, list, stats, options, parent. Navigation unten: Lernen, Vokabeln, Album, Statistik, Optionen, Eltern. Klicks per Delegation auf `[data-a]` (`switch(d.a)`), Eingaben über `data-change`. Modals über `ui.modal`.
 - Hilfe: `HELP`-Objekt (Texte je Bereich/Abschnitt), `helpBtn`, `helpModal`; „? Hilfe“ neben dem Sprach-Dropdown, im Elternbereich „?“ im Abschnittskopf.
 - Browser-Zurück: History API (`pushHist`, popstate) springt in der App einen Bildschirm zurück.
+- Neuladen: `saveNav`/`restoreNav` (sessionStorage `woerter-sammler-ansicht`, bei jedem `render`) stellt Ansicht, Abschnitt und Scrollposition wieder her; Elternbereich bleibt nach Neuladen entsperrt. `render()` sperrt den Elternbereich, sobald eine andere Ansicht gezeigt wird, also fragt Vor/Zurück/Navigation danach wieder nach der PIN. Lernrunde/Päckchen → Start.
 
 ## Funktionen (Stand)
 - Mehrere Sprachen, je eigene Vokabeln, Punkte, Päckchen, Album, Statistik. Sprachauswahl als Dropdown; im Elternbereich Umschalter „Alle Sprachen / Einzelne Sprache“ (Alle: Punkte & Abfrage gelten für alle).

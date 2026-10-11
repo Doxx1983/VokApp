@@ -1662,7 +1662,15 @@ function confetti(n){try{
     e.style.animationDelay=(Math.random()*.15)+'s';
     document.body.appendChild(e);setTimeout(()=>e.remove(),1700);}
 }catch(_){}}
+/* Neuladen bleibt auf dem Bildschirm (auch im entsperrten Elternbereich); gilt nur für diesen Tab (sessionStorage) */
+const NAV_KEY='woerter-sammler-ansicht',NAV_VIEWS={home:1,list:1,album:1,stats:1,options:1,parent:1};
+function saveNav(){try{sessionStorage.setItem(NAV_KEY,JSON.stringify({v:NAV_VIEWS[ui.view]?ui.view:'home',u:ui.view==='parent'&&ui.unlocked,sec:ui.sec,ps:ui.pscope,y:window.scrollY||0}));}catch(e){}}
+function restoreNav(){
+  try{const n=JSON.parse(sessionStorage.getItem(NAV_KEY)||'null');if(!n||!NAV_VIEWS[n.v])return 0;
+    ui.view=n.v;ui.unlocked=!!(n.u&&n.v==='parent'&&S.pinHash);if(typeof n.sec==='string')ui.sec=n.sec;if(n.ps==='all'||n.ps==='one')ui.pscope=n.ps;return +n.y||0;}catch(e){return 0;}
+}
 function render(){
+  if(ui.view!=='parent')ui.unlocked=false;
   applyTheme();
   let h='';
   switch(ui.view){
@@ -1686,6 +1694,7 @@ function render(){
   if(ui.view==='options'){const b=document.querySelector('.bk.on');if(b&&b.scrollIntoView)b.scrollIntoView({inline:'center',block:'nearest'});}
   if(lastView==='quiz'&&ui.view!=='quiz'&&S.pomo&&!S.pomo.lock){S.pomo=pomoOnEnd(S.pomo,Date.now());save();}
   if(lastView!==ui.view){window.scrollTo(0,0);if(lastView!==null&&!popping)pushHist();lastView=ui.view;}
+  saveNav();
   if(ui.view==='quiz'){
     if(Q.phase==='ask'){const a=$('#ans');if(a)a.focus();}else if(Q.phase==='fb'){const b=$('#nextbtn');if(b)b.focus();}
   }
@@ -2204,7 +2213,7 @@ document.addEventListener('keydown',e=>{
   else if(ui.view==='parent'&&!ui.unlocked){const b=document.querySelector('[data-a="pin-go"],[data-a="pin-set"]');if(b)b.click();}
 });
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save();else syncTime();});
-window.addEventListener('pagehide',()=>save());
+window.addEventListener('pagehide',()=>{save();saveNav();});
 window.addEventListener('popstate',e=>{
   if(!S.pinHash||(S.pomo&&S.pomo.lock)){pushHist();return;}
   if(ui.modal||ui.catOpen||ui.themeOpen||ui.confirm||ui.kidMenu){ui.modal=null;ui.catOpen='';ui.themeOpen=false;ui.confirm=null;ui.kidMenu=false;pushHist();render();return;}
@@ -2221,8 +2230,9 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredIns
   try{db=await idbOpen();const all=await idbAll();for(const id of Object.keys(all)){BLOBS[id]=all[id];IMG[id]=URL.createObjectURL(all[id]);}}catch(e){db=null;}
   try{if(navigator.storage&&navigator.storage.persist){ui.persisted=await navigator.storage.persist();}}catch(e){}
   try{const hb=+(localStorage.getItem(POMO_HB)||0);if(S.pomo&&!S.pomo.lock&&S.pomo.idle==null&&hb)S.pomo.idle=hb;}catch(e){}
-  try{history.replaceState({v:'home'},'');}catch(e){}
-  pomoTick();save();render();setInterval(pomoTick,1000);syncTime();
+  const navY=restoreNav();
+  try{history.replaceState({v:ui.view},'');}catch(e){}
+  pomoTick();save();render();if(navY)window.scrollTo(0,navY);setInterval(pomoTick,1000);syncTime();
   /* über „Teilen“ (z. B. aus WhatsApp) geöffnete Abgleich-Datei, vom Service Worker zwischengespeichert */
   if(/[?&]shared=1/.test(location.search)){
     try{history.replaceState({v:'home'},'',location.pathname);}catch(e){}

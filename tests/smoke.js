@@ -8,7 +8,7 @@ class FakeSR{start(){FakeSR.lastLang=this.lang;setTimeout(()=>{if(say.v!==null)t
 const win={scrollTo(){},addEventListener(t,f){handlers['w_'+t]=f;}};win.window=win;
 const ctx={console,setTimeout,clearTimeout,setInterval:()=>0,Math,Date,JSON,Promise,Set,Array,Object,String,Number,isFinite,URL,Blob,Intl,
   document:{documentElement:{style:{props:{},removeProperty(p){delete this.props[p];},setProperty(p,v){this.props[p]=v;}}},querySelector:stub,querySelectorAll:()=>[],addEventListener:(t,f)=>{handlers[t]=f;},body:{classList:{toggle(){}}},createElement:()=>({getContext:()=>({}),toBlob(cb){cb(new Blob(['x']))},click(){},remove(){}})},
-  window:win,localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>{store[k]=v;},removeItem:k=>{delete store[k];}},navigator:{},location:{protocol:'https:'},
+  window:win,localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>{store[k]=v;},removeItem:k=>{delete store[k];}},sessionStorage:{d:{},getItem(k){return this.d[k]??null;},setItem(k,v){this.d[k]=v;}},navigator:{},location:{protocol:'https:'},
   history:{pushed:[],pushState(st){this.pushed.push(st);},replaceState(){}},require_assert:assert,stub,process,handlers,FakeSR,say};
 
 const test=`
@@ -317,7 +317,7 @@ const test=`
   await click({a:'sync-new'});assert.equal(S.kidName,'Tom');assert.equal(S.pid,'tom-pid');assert(ui.pendingSync);await click({a:'sync-yes'});
   assert(curLang()&&curLang().vocab.some(w=>w.id==='sk1'),'Toms Daten');assert.equal(PROF.list.length,3);
   ui.view='home';render();assert(app().includes('Profil: <b>Tom'),'Profil auf der Startseite');
-  ui.view='parent';ui.sec='kids';render();
+  ui.view='parent';ui.unlocked=true;ui.sec='kids';render();
   const benKey=PROF.list.find(p=>p.name==='Ben').key;await click({a:'kid-del',key:'kid-del:'+benKey});await click({a:'kid-del',key:'kid-del:'+benKey});
   assert.equal(PROF.list.length,2);assert(!localStorage.getItem(benKey),'Ben gelöscht');
   await click({a:'kid-menu'});assert(app().includes('kidmenu')&&app().includes('Weiteres Kind anlegen'),'Menü über den Namen');
@@ -326,6 +326,16 @@ const test=`
   await click({a:'kid-menu'});await click({a:'kid-new'});assert(ui.sec==='kids'&&!ui.kidMenu);
   await click({a:'kid-switch',k:PROF.list.find(p=>p.name==='Mia').key});assert.equal(S.kidName,'Mia');assert.equal(curLang().vocab.length,miaWords,'Mias Daten unverändert');
   ui.unlocked=false;ui.view='home';render();}
+ // Neuladen bleibt auf dem Bildschirm, Elternbereich nur ohne Verlassen ohne PIN
+ {ui.view='parent';ui.unlocked=true;ui.sec='sync';render();
+  ui.view='home';ui.unlocked=false;ui.sec='';assert.equal(restoreNav(),0);assert(ui.view==='parent'&&ui.unlocked&&ui.sec==='sync','Neuladen: Elternbereich bleibt offen');
+  render();await click({a:'nav',v:'stats'});assert(!ui.unlocked);
+  ui.view='home';restoreNav();assert(ui.view==='stats'&&!ui.unlocked,'Neuladen: Statistik');
+  await click({a:'nav',v:'parent'});assert(!ui.unlocked&&app().includes('Bitte PIN eingeben'),'Elternbereich nach Verlassen nur mit PIN');
+  ui.view='parent';ui.unlocked=true;render();await handlers.w_popstate({state:{v:'home'}});assert(!ui.unlocked);
+  await handlers.w_popstate({state:{v:'parent'}});assert(ui.view==='parent'&&!ui.unlocked&&app().includes('Bitte PIN eingeben'),'Vor/Zurück: PIN');
+  ui.view='quiz';saveNav();ui.view='home';restoreNav();assert.equal(ui.view,'home','Lernrunde → Start');
+  ui.view='home';render();}
  // Altdaten migrieren
  console.log('SMOKE OK');
 })().catch(e=>{console.error('FEHLER:',e.stack||e);process.exit(1);});
