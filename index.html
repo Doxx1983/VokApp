@@ -130,6 +130,8 @@ textarea.in{resize:vertical;min-height:120px}
 @media (max-width:540px){.lrow{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 46px;grid-template-areas:"f d s" "u u u"}.lrow .c-f{grid-area:f}.lrow .c-d{grid-area:d}.lrow .c-u{grid-area:u}.lrow .c-s{grid-area:s}.lhead .c-u{min-height:30px!important;padding:0!important}}
 .lvl{display:flex;gap:2px;align-items:flex-end;height:16px}.lvl i{flex:1;background:var(--line);border-radius:2px;height:100%}.lvl i:nth-child(1){height:30%}.lvl i:nth-child(2){height:50%}.lvl i:nth-child(3){height:68%}.lvl i:nth-child(4){height:84%}.lvl i.on{background:var(--accent)}.lvl i.top{background:var(--good)}
 .lrow:last-child{border:0}
+.lrow.woff>.c-f,.lrow.woff>.c-d{opacity:.55}
+.offtag{display:inline-block;font-size:12px;font-weight:800;padding:1px 7px;border-radius:99px;background:var(--surface-2);color:var(--muted);margin-left:4px}
 .lhead{background:var(--accent-soft);position:sticky;top:env(safe-area-inset-top,0px);z-index:2}
 .lhead button{appearance:none;border:0;background:none;color:var(--ink);font:inherit;font-weight:900;font-size:14px;text-align:left;padding:6px 0;cursor:pointer;min-height:40px}
 /* Karten */
@@ -331,7 +333,7 @@ function tagsOf(w){return Array.isArray(w.tags)?w.tags:(w.unit?[w.unit]:[]);}
 function pickSession(vocab,unit,size,now,rnd){
   rnd=rnd||Math.random;
   const sel=Array.isArray(unit)?unit:(unit?[unit]:[]);
-  const pool=vocab.filter(w=>!sel.length||tagsOf(w).some(t=>sel.includes(t)));
+  const pool=vocab.filter(w=>!w.off&&(!sel.length||tagsOf(w).some(t=>sel.includes(t))));
   const sc=w=>(6-w.box)*10+Math.min(w.wrong||0,5)*2+((w.seen||0)===0?4:0)+rnd()*8;
   const due=pool.filter(w=>w.due<=now).map(w=>({w,s:sc(w)})).sort((a,b)=>b.s-a.s).map(o=>o.w);
   let pick=due.slice(0,size);
@@ -738,12 +740,14 @@ const HELP={
     'Lies das Wort oben und gib die Übersetzung ein. Mit „Prüfen“ siehst du, ob es stimmt.',
     'Kleine Tippfehler werden erkannt und als richtig gewertet.',
     'Falsche Wörter kommen in der Runde noch einmal vor.',
-    'Richtige Antworten bringen Punkte für das nächste Päckchen.']],
+    'Richtige Antworten bringen Punkte für das nächste Päckchen.',
+    'Zu schwer: Ist ein Wort viel zu schwer, tippe auf „Zu schwer“. Es fällt aus der Runde und Mama oder Papa schauen es sich an. Das kostet keine Punkte.']],
   list:['Vokabeln',[
     'Hier siehst du alle Wörter der gewählten Sprache.',
     'Kategorien: Mit dem Auswahlfeld filterst du die Liste. Du kannst mehrere Kategorien wählen, es erscheinen alle Wörter, die in mindestens einer davon stehen.',
     'Stand: Zeigt, wie gut du ein Wort kannst. Keine Balken = noch neu. Je mehr Balken, desto sicherer; grüne Balken heißen sicher gelernt. Falsche Antworten setzen den Stand zurück.',
     'Sortieren: Tippe auf eine Spaltenüberschrift (auch „Kategorie“ und „Stand“). Nochmal tippen dreht die Reihenfolge um.',
+    'Pausiert: Diese Wörter haben Mama oder Papa vorübergehend aus der Abfrage genommen.',
     'Die Liste dient zum Nachschlagen und Üben. Bearbeiten können nur die Eltern im Elternbereich.']],
   album:['Album',[
     'Hier siehst du alle Karten, die du in der ausgewählten Sprache schon gesammelt hast.',
@@ -783,6 +787,12 @@ const HELP={
     'Wort bearbeiten: Tippe auf ✎. Tags kannst du eintippen oder aus der Liste antippen.',
     'Ein Wort mit gleichem Paar wird nicht doppelt angelegt, sondern bekommt die neuen Tags dazu.',
     'Mehrere richtige Antworten trennst du mit „/“.']],
+  hard:['Zu schwere Wörter',[
+    'Meldungen: Hier stehen Wörter, die beim Lernen mit „Zu schwer“ gemeldet wurden, die neuesten oben. Die Zahl im Abschnittskopf zeigt offene Meldungen.',
+    'Bearbeiten: Mit ✎ änderst du Fremdwort, Deutsch und Tags. Weitere richtige Antworten trennst du mit „/“, z. B. „Hose / Hosen“.',
+    'Aktiv / Pausiert: Ein pausiertes Wort wird nicht mehr abgefragt, bleibt aber in der Vokabelliste (markiert als „pausiert“) und in der Sicherung. Tippen schaltet um.',
+    'Erledigt: Entfernt die Meldung. Pausierte Wörter bleiben in dieser Liste, bis du sie wieder aktivierst.',
+    'Pausieren geht auch im Fenster „Wort bearbeiten“ über das Häkchen.']],
   cards:['Karten',[
     'Bilder importieren: Aus der Galerie (mehrere auswählen) oder als ZIP-Datei mit vielen Bildern.',
     'Dateiname = Kartenname. Erneutes Importieren mit gleichem Namen ergänzt fehlende Bilder.',
@@ -914,7 +924,7 @@ function vStats(){
   const L=curLang();
   if(!L) return `<div class="panel center"><p>Noch keine Sprache angelegt.</p></div>`;
   const now=new Date(),nowMs=Date.now(),log=L.log||(L.log={});
-  const total=L.vocab.length,dueN=L.vocab.filter(w=>w.due<=nowMs).length,known=L.vocab.filter(w=>w.box>=4&&w.seen>0).length,fresh=L.vocab.filter(w=>!(w.seen>0)).length,learn=total-known-fresh;
+  const total=L.vocab.length,dueN=L.vocab.filter(w=>!w.off&&w.due<=nowMs).length,known=L.vocab.filter(w=>w.box>=4&&w.seen>0).length,fresh=L.vocab.filter(w=>!(w.seen>0)).length,learn=total-known-fresh;
   const rt=L.vocab.reduce((a,w)=>a+(w.right||0),0),wr=L.vocab.reduce((a,w)=>a+(w.wrong||0),0);
   const quote=rt+wr?Math.round(rt/(rt+wr)*100)+' %':'–';
   const have=L.cards.filter(c=>L.owned[c.id]>0).length;
@@ -958,7 +968,7 @@ function vList(){
   ${units.length>1?catDrop('list',ui.lf,units,'Alle Kategorien'):''}
   <div class="panel lt">
     <div class="lrow lhead"><button class="c-f" data-a="list-sort" data-c="f">${esc(L.name)}${ar('f')}</button><button class="c-d" data-a="list-sort" data-c="d">Deutsch${ar('d')}</button><button class="c-u" data-a="list-sort" data-c="u">Kategorie${ar('u')}</button><button class="c-s" data-a="list-sort" data-c="k">Stand${ar('k')}</button></div>
-    ${ws.length?ws.map(w=>`<div class="lrow"><b class="c-f">${esc(w.f)}</b><span class="c-d">${esc(w.d)}</span><span class="c-u muted sm">${tagsOf(w).map(esc).join(', ')}</span>${lvl(w).replace('class="lvl"','class="lvl c-s"')}</div>`).join(''):'<div class="lrow"><span class="muted">Keine Wörter.</span></div>'}
+    ${ws.length?ws.map(w=>`<div class="lrow${w.off?' woff':''}"><b class="c-f">${esc(w.f)}</b><span class="c-d">${esc(w.d)}</span><span class="c-u muted sm">${tagsOf(w).map(esc).join(', ')}${w.off?'<span class="offtag">pausiert</span>':''}</span>${lvl(w).replace('class="lvl"','class="lvl c-s"')}</div>`).join(''):'<div class="lrow"><span class="muted">Keine Wörter.</span></div>'}
   </div>`;
 }
 
@@ -995,7 +1005,7 @@ function vQuiz(){
     <button id="nextbtn" class="btn primary block" style="min-height:60px;font-size:19px" data-a="next">${Q.queue.length?'Weiter':'Fertig'}</button>`;
   }
   return `<div class="qtop"><button class="icon-btn" data-a="quit" aria-label="Beenden">✕</button><div class="bar grow"><i style="width:${pct}%"></i></div><span class="pill">+${Q.earned}</span></div>
-  <div class="qcard"><div class="qlabel">${qLabel(L,it.dir,speak)}</div><div class="qword">${esc(q)}</div>${Q.phase==='ask'&&Q.hint>0?`<div class="qhint">${esc(hintText(ans,Q.hint))}</div>`:''}</div>${body}`;
+  <div class="qcard"><div class="qlabel">${qLabel(L,it.dir,speak)}</div><div class="qword">${esc(q)}</div>${Q.phase==='ask'&&Q.hint>0?`<div class="qhint">${esc(hintText(ans,Q.hint))}</div>`:''}</div>${body}${Q.phase==='ask'||Q.phase==='fb'?`<div class="center" style="margin-top:14px">${Q.marked===it.id?'<span class="pill">Gemeldet ✓</span>':'<button class="btn small" data-a="too-hard">Zu schwer</button>'}</div>`:''}`;
 }
 
 function vSummary(){
@@ -1073,6 +1083,7 @@ function vParent(){
   if(ui.pscope==='all')h+=`<p class="note">Vokabeln, Karten, Kartenrücken und Spezielle Belohnungen gehören zu einer Sprache. Wähle dafür „Einzelne Sprache“.</p>`;
   else{
   h+=secBtn('vocab','Vokabeln');if(ui.sec==='vocab')h+=L?pVocab(L):noLang();
+  {const nh=L?L.vocab.filter(w=>w.hard).length:0;h+=secBtn('hard','Zu schwere Wörter'+(nh?` <span class="pill">${nh} neu</span>`:''));if(ui.sec==='hard')h+=L?pHard(L):noLang();}
   h+=secBtn('cards','Karten');if(ui.sec==='cards')h+=L?pCards(L):noLang();
   h+=secBtn('prizes','Spezielle Belohnungen');if(ui.sec==='prizes')h+=L?pPrizes(L):noLang();
   h+=secBtn('backs','Kartenrücken');if(ui.sec==='backs')h+=L?pBacks(L):noLang();
@@ -1101,8 +1112,14 @@ function pVocab(L){
   <button class="subhead" data-a="toggle-cats" aria-expanded="${ui.cats}"><span>Vorhandene Tags (${units.length})</span><span>${ui.cats?'−':'+'}</span></button>
   ${!ui.cats?'':units.length?units.map(u=>{const ws=L.vocab.filter(w=>hasTag(w,u));const open=ui.openUnit===u;
     return `<div class="urow cat"><div class="t"><b>#${esc(u)}</b><div class="note">${ws.length} Wörter</div></div><button class="btn small" data-a="open-unit" data-u="${esc(u)}">${open?'Zuklappen':'Ansehen'}</button><button class="btn small" data-a="rename-unit" data-u="${esc(u)}">Umbenennen</button>${confBtn('del-unit:'+u,'Löschen','')}</div>
-    ${open?ws.map(w=>`<div class="wrow"><div class="t">${esc(w.f)} = ${esc(w.d)}</div><button class="x edit" data-a="edit-word" data-id="${w.id}" aria-label="Wort bearbeiten">✎</button><button class="x" data-a="del-word" data-id="${w.id}" aria-label="Wort löschen">✕</button></div>`).join(''):''}`;}).join(''):'<p class="muted">Noch keine Vokabeln.</p>'}
+    ${open?ws.map(w=>`<div class="wrow"><div class="t">${esc(w.f)} = ${esc(w.d)}${w.off?'<span class="offtag">pausiert</span>':''}</div><button class="x edit" data-a="edit-word" data-id="${w.id}" aria-label="Wort bearbeiten">✎</button><button class="x" data-a="del-word" data-id="${w.id}" aria-label="Wort löschen">✕</button></div>`).join(''):''}`;}).join(''):'<p class="muted">Noch keine Vokabeln.</p>'}
   ${L.vocab.length?`<div style="margin-top:14px">${confBtn('reset-learn:x','Lernstand zurücksetzen','')}</div><p class="note">Setzt nur den Lernfortschritt der Wörter zurück. Punkte und Karten bleiben.</p>`:''}
+  </div>`;
+}
+function pHard(L){
+  const ws=L.vocab.filter(w=>w.hard||w.off).sort((a,b)=>(b.hard?1:0)-(a.hard?1:0)||(b.hardTs||0)-(a.hardTs||0));
+  return `<div class="secbody"><p class="note" style="margin-top:0">Hier landen Wörter, die beim Lernen als „Zu schwer“ gemeldet wurden. Mit ✎ kannst du die Antwort ändern (weitere richtige Antworten mit „/“ trennen). „Pausiert“ nimmt ein Wort aus der Abfrage, bis es passt. „Erledigt“ entfernt die Meldung.</p>
+  ${ws.length?ws.map(w=>`<div class="urow"><div class="t"><b>${esc(w.f)}</b> = ${esc(w.d)}<div class="note">${w.hard?'Gemeldet'+(w.hardTs?' am '+fmtDate(w.hardTs):''):'Nicht gemeldet'}${w.off?' · wird nicht abgefragt':''}</div></div><button class="tog ${w.off?'':'on'}" data-a="toggle-off" data-id="${w.id}">${w.off?'Pausiert':'Aktiv'}</button><button class="x edit" data-a="edit-word" data-id="${w.id}" aria-label="Wort bearbeiten">✎</button>${w.hard?`<button class="btn small" data-a="unhard" data-id="${w.id}">Erledigt</button>`:''}</div>`).join(''):'<p class="muted">Keine Wörter gemeldet.</p>'}
   </div>`;
 }
 const missingImgs=L=>L.cards.filter(c=>!IMG[c.id]).length;
@@ -1216,6 +1233,7 @@ function vModal(){
     <div class="field"><label for="we-d">Deutsch</label><input id="we-d" class="in" value="${esc(w.d)}" maxlength="80"></div>
     <div class="field"><label for="we-u">Tags</label><input id="we-u" class="in" value="${esc(tagsOf(w).map(t=>'#'+t).join(' '))}" maxlength="200">
     <div class="tagpick">${unitsOf(L).map(u=>`<button type="button" class="tagchip ${hasTag(w,u)?'on':''}" data-a="wtag" data-t="${esc(u)}">#${esc(u)}</button>`).join('')}</div></div>
+    <label class="chk"><input type="checkbox" id="we-off" ${w.off?'checked':''}> Pausiert (wird nicht abgefragt)</label>
     <div class="row"><button class="btn primary grow" data-a="save-word" data-id="${w.id}">Speichern</button>${confBtn('del-wordm:'+w.id,'Löschen','')}</div>
     <button class="btn block" style="margin-top:8px" data-a="close-modal">Abbrechen</button>`);
   }
@@ -1404,7 +1422,21 @@ function resolveAnswer(kind,heard){
   save();
   Q.fb={kind,pts,hinted,retry,dropped,heard:heard||''};Q.phase='fb';Q.speechMsg='';render();
 }
+/* Kind meldet ein Wort als zu schwer: kommt auf die Elternliste, fällt aus dieser Runde, ohne Punkte oder Lernstand zu ändern. */
+function markHard(){
+  const L=curLang(),it=Q.phase==='fb'?Q.last:Q.queue[0];if(!it)return;
+  const w=L.vocab.find(x=>x.id===it.id);if(!w)return;
+  w.hard=true;w.hardTs=Date.now();save();
+  const ask=Q.phase==='ask';
+  Q.queue=Q.queue.filter(x=>x.id!==it.id);
+  toast('Gemerkt! Mama oder Papa schauen sich das Wort an.');
+  if(!ask){Q.marked=it.id;render();return;}
+  stopListen();if(it.first)Q.total--;
+  if(Q.total<1){Q=null;ui.view='home';render();return;}
+  nextQuestion();
+}
 function nextQuestion(){
+  Q.marked='';
   Q.hint=0;Q.phase='ask';Q.speechMsg='';Q.t0=Date.now();
   if(!Q.queue.length){finishQuiz();return;}
   render();
@@ -1588,6 +1620,7 @@ document.addEventListener('click',async e=>{
       if(Q.hint<letters-1)Q.hint++;
       const v=val('#ans');render();const a=$('#ans');if(a){a.value=v;a.focus();}break;}
     case 'next':nextQuestion();break;
+    case 'too-hard':markHard();break;
     case 'open-pack':openPack();break;
     case 'tear':{if(navigator.vibrate)navigator.vibrate(30);const go=()=>{ui.pack.opened=true;render();};if(window.matchMedia&&!matchMedia('(prefers-reduced-motion:reduce)').matches){el.classList.add('tearing');setTimeout(go,420);}else go();break;}
     case 'flip':{
@@ -1686,10 +1719,12 @@ document.addEventListener('click',async e=>{
       const w=L.vocab.find(x=>x.id===d.id);if(!w)break;
       const f=val('#we-f').trim(),dd=val('#we-d').trim(),u=splitTags(val('#we-u'));
       if(!f||!dd){toast('Beide Wörter müssen ausgefüllt sein.');break;}
-      w.f=f;w.d=dd;w.tags=u.length?u:['Allgemein'];save();ui.modal=null;render();toast('Gespeichert');break;}
+      w.f=f;w.d=dd;w.tags=u.length?u:['Allgemein'];const off=$('#we-off');if(off){if(off.checked)w.off=true;else delete w.off;}save();ui.modal=null;render();toast('Gespeichert');break;}
     case 'del-wordm':{
       if(!ask(d.key))break;
       const id=d.key.split(':')[1];L.vocab=L.vocab.filter(w=>w.id!==id);save();ui.modal=null;render();break;}
+    case 'toggle-off':{const w=L.vocab.find(x=>x.id===d.id);if(!w)break;if(w.off)delete w.off;else w.off=true;save();render();break;}
+    case 'unhard':{const w=L.vocab.find(x=>x.id===d.id);if(!w)break;delete w.hard;delete w.hardTs;save();render();break;}
     case 'del-word':L.vocab=L.vocab.filter(w=>w.id!==d.id);save();render();break;
     case 'reset-learn':{
       if(!ask(d.key))break;

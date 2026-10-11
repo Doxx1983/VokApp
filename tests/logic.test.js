@@ -49,4 +49,5 @@ const m=api.migrate({langs:[{id:'1',name:'Englisch',vocab:[]}],activeLang:'zzz'}
 assert.equal(m.activeLang,'1');assert.deepEqual(m.rewards,[]);assert.equal(m.mode,'write');assert.equal(m.langs[0].speechLang,'auto');assert.equal(api.resolveSpeechLang(m.langs[0]),'en-GB');
 assert.equal(api.migrate({langs:[{id:'1',name:'Englisch',vocab:[],speechLang:'en-US'}]}).langs[0].speechLang,'en-US','manuelle Wahl bleibt');
 assert.equal(api.resolveSpeechLang({name:'Französisch',speechLang:'auto'}),'fr-FR');assert.equal(api.resolveSpeechLang({name:'Spanisch'}),'es-ES');assert.equal(api.resolveSpeechLang({name:'Italienisch',speechLang:'auto'}),'it-IT');assert.equal(api.resolveSpeechLang({name:'Englisch',speechLang:'en-US'}),'en-US');assert.deepEqual(m.langs[0].wins,[]);assert.equal(m.langs[0].goal,100);
+{const v=[{id:'a',tags:['T'],box:1,due:0},{id:'b',tags:['T'],box:1,due:0,off:true},{id:'c',tags:['T'],box:2,due:9e15,off:true}];assert.deepEqual(api.pickSession(v,[],10,Date.now()),['a'],'pausierte Wörter nicht abfragen');assert.deepEqual(api.pickSession(v.slice(1),['T'],10,Date.now()),[]);}
 console.log('Logik-Tests OK');

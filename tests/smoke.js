@@ -240,6 +240,27 @@ const test=`
    await click({a:'edit-word',id:'t1'});stub('#we-u').value='#TagY';await click({a:'save-word',id:'t1'});await click({a:'edit-word',id:'t1'});
    stub('#we-f').value='zz1';stub('#we-d').value='y1';stub('#we-u').value='#TagY #Neu #tagy';await click({a:'save-word',id:'t1'});assert.deepEqual(Lc.vocab.find(w=>w.id==='t1').tags,['TagY','Neu']);
    Lc.vocab=Lc.vocab.filter(w=>w.id!=='t1');ui.unlocked=false;ui.view='home';render();}
+  // Zu schwer: melden, Elternliste, pausieren
+  {const Lc=curLang();Lc.vocab.push({id:'h1',f:'hh1',d:'g1',tags:['HT'],box:1,due:0,seen:0,right:0,wrong:0},{id:'h2',f:'hh2',d:'g2',tags:['HT'],box:1,due:0,seen:0,right:0,wrong:0});
+   ui.unit=['HT'];S.pomo=null;Lc.sessionSize=10;ui.view='home';render();await click({a:'start'});assert.equal(ui.view,'quiz');assert.equal(Q.total,2);
+   assert(app().includes('data-a="too-hard"'),'Knopf Zu schwer');
+   const id0=Q.queue[0].id,pts0=Lc.points,e0=Q.earned;await click({a:'too-hard'});
+   const w0=Lc.vocab.find(w=>w.id===id0);assert(w0.hard&&w0.hardTs,'markiert');assert.equal(w0.seen,0,'Lernstand unverändert');assert.equal(Lc.points,pts0);assert.equal(Q.earned,e0);
+   assert(!Q.queue.some(x=>x.id===id0)&&Q.total===1&&Q.phase==='ask','aus der Runde');
+   const id1=Q.queue[0].id,w1=Lc.vocab.find(w=>w.id===id1);stub('#ans').value='falsch123';await click({a:'check'});assert.equal(Q.phase,'fb');
+   await click({a:'too-hard'});assert(w1.hard&&Q.marked===id1&&!Q.queue.length,'nach Antwort melden');assert(app().includes('Gemeldet ✓'));
+   await click({a:'next'});assert.equal(ui.view,'summary');
+   ui.view='parent';ui.unlocked=true;ui.pscope='one';ui.sec='hard';render();
+   assert(app().includes('Zu schwere Wörter')&&app().includes('2 neu')&&app().includes('hh1')&&app().includes('data-a="toggle-off"'),'Elternliste');
+   await click({a:'toggle-off',id:'h1'});assert(Lc.vocab.find(w=>w.id==='h1').off);
+   for(let i=0;i<20;i++)assert(!pickSession(Lc.vocab,['HT'],10,Date.now()).includes('h1'),'pausiert nicht abgefragt');
+   await click({a:'unhard',id:'h1'});assert(!Lc.vocab.find(w=>w.id==='h1').hard);render();assert(app().includes('hh1'),'pausiert bleibt in der Liste');assert(app().includes('1 neu'));
+   await click({a:'edit-word',id:'h2'});stub('#we-f').value='hh2';stub('#we-d').value='g2 / G zwei';stub('#we-u').value='#HT';stub('#we-off').checked=true;await click({a:'save-word',id:'h2'});
+   assert(Lc.vocab.find(w=>w.id==='h2').off&&Lc.vocab.find(w=>w.id==='h2').d==='g2 / G zwei','Bearbeiten + Pausieren im Modal');stub('#we-off').checked=false;
+   ui.view='list';ui.lf=[];render();assert(app().includes('woff')&&app().includes('pausiert'),'Vokabelliste kennzeichnet');
+   assert(JSON.parse(JSON.stringify(S)).langs.find(l=>l.id===Lc.id).vocab.find(w=>w.id==='h1').off,'im Backup');
+   ui.unit=['HT'];ui.view='home';render();await click({a:'start'});assert.notEqual(ui.view,'quiz','alle pausiert: keine Runde');
+   Lc.vocab=Lc.vocab.filter(w=>w.id!=='h1'&&w.id!=='h2');ui.unit=[];ui.unlocked=false;ui.view='home';Q=null;render();}
  // Altdaten migrieren
  console.log('SMOKE OK');
 })().catch(e=>{console.error('FEHLER:',e.stack||e);process.exit(1);});
