@@ -2,7 +2,7 @@
 const fs=require('fs'),assert=require('assert');
 const h=fs.readFileSync(require('path').join(__dirname,'..','index.html'),'utf8');
 const l=h.split('//LOGIC-START')[1].split('//LOGIC-END')[0];
-const A=new Function(l+';return {migrate,syncSig,syncStamp,syncPayload,syncMerge,syncTarget}')();
+const A=new Function(l+';return {migrate,syncSig,syncStamp,syncPayload,syncMerge,syncTarget,tradeNorm,tradeDups,tradePick,tradePrize,tradeApply}')();
 const clone=o=>JSON.parse(JSON.stringify(o));
 let T=1000000;
 // Gerät: Zustand + Signatur, edit() ändert und speichert wie save() in der App
@@ -143,4 +143,35 @@ assert(A.syncTarget({pid:'p9'},[P[0]],'k1',true,true).err,'Kind: schon verknüpf
 // Vollständige Sicherung als Abgleich-Quelle (ohne kind) funktioniert über syncPayload
 const full={app:'woerter-sammler',v:1,state:clone(par.S),images:{x:'data:image/png;base64,AA'}};
 const conv=A.syncPayload(A.migrate(full.state),0);assert(!JSON.stringify(conv).includes('data:image'));
+// Doppelte Karten eintauschen
+{const t=A.tradeNorm(undefined);assert.deepEqual(t,{active:false,need:{n:3,s:3,e:3,l:3},kind:'pack',packs:1,rid:''},'Standard');
+ assert.equal(A.tradeNorm({need:{n:0,e:99},kind:'x',packs:50}).need.n,3);assert.equal(A.tradeNorm({need:{e:99}}).need.e,20);assert.equal(A.tradeNorm({kind:'x'}).kind,'pack');
+ const mk=()=>{const L=A.migrate(base('t1',['a','b','c'])).langs[0];
+   L.cards=[{id:'k1',name:'Hund',rarity:'n'},{id:'k2',name:'Katze',rarity:'n'},{id:'k3',name:'Drache',rarity:'e'},{id:'k4',name:'Fuchs',rarity:'n'}];
+   L.owned={k1:3,k2:2,k3:4,k4:1};return L;};
+ let L=mk();assert.deepEqual(A.tradeDups(L),{n:3,s:0,e:3,l:0},'nur Exemplare über das erste');
+ assert.deepEqual(A.tradePick(L,'n',3),[{id:'k1',name:'Hund',n:2},{id:'k2',name:'Katze',n:1}],'meiste Doppelte zuerst');
+ assert.equal(A.tradePick(L,'n',4),null,'reicht nicht');
+ const cfg={active:true,need:{n:3,s:3,e:2,l:1},kind:'pack',packs:2};
+ let r=A.tradeApply(L,cfg,'n',[],5,()=> 'w1');assert.equal(L.packs,2);assert.deepEqual(L.owned,{k1:1,k2:1,k3:4,k4:1},'erste Karte bleibt');
+ assert(A.tradeApply(L,cfg,'n',[],5,()=>'w').err,'keine Doppelten mehr');
+ assert(A.tradeApply(L,{...cfg,active:false},'e',[],5,()=>'w').err,'ausgeschaltet');
+ r=A.tradeApply(L,{...cfg,kind:'legend',packs:1},'e',[],5,()=>'w');assert.deepEqual(L.sp,['legend']);assert.equal(L.owned.k3,2);
+ const rw=[{id:'r1',text:'Eis',rarity:'s',active:true,once:true,mt:{}}];
+ assert(A.tradeApply(L,{...cfg,kind:'text',rid:'rx'},'e',rw,5,()=>'w').err,'fehlende Belohnung');assert.equal(L.owned.k3,2,'nichts abgezogen');
+ r=A.tradeApply(L,{...cfg,need:{...cfg.need,e:1},kind:'text',rid:'r1'},'e',rw,7,()=>'win1');assert(!r.err);assert.equal(L.wins.at(-1).text,'Eis');assert.equal(L.wins.at(-1).src,'trade');assert.equal(L.owned.k3,1);assert(!rw[0].active,'einmalig');
+ assert.equal(A.tradePrize({kind:'text',rid:'r1'},rw),null,'pausierte Belohnung nicht tauschbar');
+ assert.equal(A.tradePrize({kind:'pack',packs:3},[]).label,'3× Päckchen');assert.equal(A.tradePrize({kind:'mega',packs:1},[]).label,'Mega-Pack');}
+// Tausch und Abgleich: Einstellung mit Zeitstempel, nichts wird verdoppelt
+{const kid=device(base('t1',['a','b','c'])),par=device(clone(kid.S));
+ par.edit(s=>{s.tradeCfg.active=true;s.tradeCfg.need.n=2;s.tradeCfg.kind='text';s.tradeCfg.rid='r1';s.rewards.push({id:'r1',text:'Kino',rarity:'s',active:true});});
+ assert(par.S.mt['tradeCfg.active']&&par.S.mt['tradeCfg.need'],'gestempelt');
+ let ch=kid.load(par.file());assert(ch.g.includes('Karten tauschen'));assert(kid.S.tradeCfg.active&&kid.S.tradeCfg.need.n===2&&kid.S.tradeCfg.kind==='text');
+ kid.edit(s=>{const L=s.langs[0];L.cards=[{id:'k1',name:'Hund',rarity:'n'}];L.owned={k1:5};A.tradeApply(L,s.tradeCfg,'n',s.rewards,T,()=>'tw1');});
+ kid.edit(s=>{s.tradeCfg.kind='pack';s.tradeCfg.packs=1;A.tradeApply(s.langs[0],s.tradeCfg,'n',s.rewards,T,()=>'x');});
+ const KL=kid.S.langs[0];assert.equal(KL.owned.k1,1);assert.equal(KL.packs,1);
+ const f=kid.file();assert(!('owned' in f.state.langs[0])&&!('cards' in f.state.langs[0]),'Album bleibt auf dem Handy');
+ par.load(f);par.load(f);const PL=par.S.langs[0];assert.equal(PL.packs,1,'Tausch-Päckchen einmal');assert.equal(PL.wins.filter(w=>w.id==='tw1').length,1,'Belohnung einmal');
+ assert.equal(par.S.tradeCfg.kind,'pack','neuere Änderung am Kind-Handy');
+ kid.load(par.file());assert.equal(kid.S.langs[0].packs,1,'zurück: nicht verdoppelt');assert.equal(kid.S.langs[0].wins.length,1);assert.equal(kid.S.langs[0].owned.k1,1,'Album unverändert');}
 console.log('Sync-Tests OK');

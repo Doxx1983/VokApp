@@ -567,6 +567,7 @@ function migrate(s){
   const c=s.streakCfg=s.streakCfg||{};c.days=Math.max(1,Math.min(365,+c.days||5));
   c.def=c.def||{};c.def.active=!!c.def.active;c.def.kind=(c.def.kind==='text'||SPECIAL_PACKS[c.def.kind])?c.def.kind:'pack';c.def.packs=Math.max(1,Math.min(10,+c.def.packs||1));c.def.rid=c.def.rid||'';
   c.nextRid=c.nextRid||'';c.nextPack=SPECIAL_PACKS[c.nextPack]?c.nextPack:'';if(c.nextPack)c.nextRid='';
+  s.tradeCfg=tradeNorm(s.tradeCfg);
   s.streak=s.streak||{last:null,count:0};
   s.langs.forEach(l=>{
     if(typeof l.back==='string'){if(!s.customBacks.some(b=>b.id===l.back))delete l.back;}else if(l.back!=null){const n=Math.round(+l.back);if(n>=1&&n<=BACKS.length)l.back=n;else delete l.back;}
@@ -629,7 +630,7 @@ function pomoOnEnd(p,now){return p&&!p.lock?{...p,idle:now}:p;}
    Geräteeigen (nicht abgeglichen): PIN, Lernpause-Sperre, Farbschema, Modus, Wörter pro Runde, Kartenrücken, Karten/Album/Bilder. */
 const SYNC_W={mt:['f','d','tags','off'],ht:['hard','hardTs'],lt:['box','due','seen','right','wrong']};
 const SYNC_L=['name','dir','goal','packSize','ppr','speechLang'];
-const SYNC_G={streakCfg:'Serien-Belohnung',pomoCfg:'Lernpause',kidName:'Name des Kindes'};
+const SYNC_G={streakCfg:'Serien-Belohnung',pomoCfg:'Lernpause',kidName:'Name des Kindes',tradeCfg:'Karten tauschen'};
 const SYNC_LOCAL_L=['cards','owned','back','sessionSize'];
 const sjs=v=>JSON.stringify(v===undefined?null:v);
 const spick=(o,ks)=>sjs(ks.map(k=>o[k]));
@@ -807,6 +808,41 @@ function syncMerge(loc,rem,now){
   for(const id in s.del)if(now-s.del[id]>400*DAY)delete s.del[id];
   return {state:s,ch};
 }
+/* Doppelte Karten eintauschen: Pro Karte zählen nur die Exemplare über das erste hinaus (das erste bleibt immer im Album).
+   cfg (S.tradeCfg, wird abgeglichen): active, need[Seltenheit] = nötige Doppelte für einen Tausch, kind 'pack'|Spezial-Pack|'text', packs = Anzahl, rid = Spezielle Belohnung.
+   Karten/Album sind geräteeigen, daher verdoppelt der Abgleich keine Karten; das Päckchen zählt als Fortschritt (pmt), die Text-Belohnung als win mit eigener Id. */
+function tradeNorm(t){
+  t=t&&typeof t==='object'?t:{};const n=t.need&&typeof t.need==='object'?t.need:{};
+  return {active:!!t.active,need:Object.fromEntries(RARITIES.map(r=>[r.k,Math.max(1,Math.min(20,Math.round(+n[r.k])||3))])),
+    kind:(t.kind==='text'||SPECIAL_PACKS[t.kind])?t.kind:'pack',packs:Math.max(1,Math.min(10,Math.round(+t.packs)||1)),rid:typeof t.rid==='string'?t.rid:''};
+}
+const tradeNeed=(cfg,rk)=>tradeNorm(cfg).need[rk]||3;
+/* Doppelte je Seltenheit: {n:Anzahl,…} */
+function tradeDups(L){const o={};RARITIES.forEach(r=>o[r.k]=0);(L.cards||[]).forEach(c=>{const n=(L.owned||{})[c.id]||0;if(n>1&&o[c.rarity]!=null)o[c.rarity]+=n-1;});return o;}
+/* welche Exemplare abgegeben werden: zuerst von den Karten mit den meisten Doppelten; null, wenn es nicht reicht */
+function tradePick(L,rk,need){
+  const left={},out=[];(L.cards||[]).forEach(c=>{const n=(L.owned||{})[c.id]||0;if(c.rarity===rk&&n>1)left[c.id]=n-1;});
+  let rest=need;
+  while(rest>0){let best=null;for(const c of L.cards)if(left[c.id]>0&&(!best||left[c.id]>left[best.id]))best=c;if(!best)return null;
+    left[best.id]--;rest--;const o=out.find(x=>x.id===best.id);if(o)o.n++;else out.push({id:best.id,name:best.name,n:1});}
+  return out;
+}
+/* Gegenwert beschreiben; null, wenn die Spezielle Belohnung fehlt */
+function tradePrize(cfg,rewards){
+  const t=tradeNorm(cfg);
+  if(t.kind==='text'){const r=(rewards||[]).find(x=>x.id===t.rid);return r&&r.active?{kind:'text',rid:r.id,text:r.text}:null;}
+  const sp=SPECIAL_PACKS[t.kind];return {kind:'pack',t:sp?t.kind:'',n:t.packs,label:(t.packs>1?t.packs+'× ':'')+(sp?sp.name:(t.packs>1?'Päckchen':'1 Päckchen'))};
+}
+/* führt einen Tausch aus (ändert L und ggf. rewards); gibt {gave,prize} oder {err} zurück */
+function tradeApply(L,cfg,rk,rewards,now,mkId){
+  const t=tradeNorm(cfg);if(!t.active)return {err:'Tauschen ist ausgeschaltet.'};
+  const need=t.need[rk],gave=tradePick(L,rk,need);if(!gave)return {err:'Nicht genug doppelte Karten.'};
+  const prize=tradePrize(t,rewards);if(!prize)return {err:'Für den Tausch ist keine Belohnung eingestellt.'};
+  gave.forEach(g=>{L.owned[g.id]-=g.n;});
+  if(prize.kind==='pack'){if(prize.t){L.sp=L.sp||[];for(let i=0;i<prize.n;i++)L.sp.push(prize.t);}else L.packs=(L.packs||0)+prize.n;}
+  else{const r=rewards.find(x=>x.id===prize.rid);L.wins=L.wins||[];L.wins.push({id:mkId(),rid:r.id,text:r.text,rarity:r.rarity,src:'trade',ts:now,redeemed:false});if(r.once)r.active=false;}
+  return {gave,prize};
+}
 //LOGIC-END
 
 /* ================= Hilfen ================= */
@@ -824,7 +860,7 @@ const ICON_FLAME='<svg viewBox="0 0 24 24" width="30" height="30" fill="currentC
 const ICON_PEN='<svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/></svg>';
 const PACK_KEY='packimg';
 const packPic=()=>IMG[PACK_KEY]?`<img src="${IMG[PACK_KEY]}" alt="Päckchen">`:`<div class="packdef"></div>`;
-const winLabel=w=>w.src==='streak'?'Serie · '+w.days+' Tage':rar(w.rarity).label;
+const winLabel=w=>w.src==='streak'?'Serie · '+w.days+' Tage':w.src==='trade'?'Tausch':rar(w.rarity).label;
 const ICON_MIC='<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
 
 /* ================= Daten ================= */
@@ -985,7 +1021,8 @@ const HELP={
     'Hier siehst du alle Karten, die du in der ausgewählten Sprache schon gesammelt hast.',
     'Tippe auf eine Karte, um sie groß zu sehen.',
     'Oben steht, wie viele Karten du schon hast.',
-    'Fehlen Bilder, können die Eltern sie im Elternbereich unter „Karten“ wiederherstellen.']],
+    'Fehlen Bilder, können die Eltern sie im Elternbereich unter „Karten“ wiederherstellen.',
+    'Tauschen: Wenn Mama oder Papa es erlauben, tauschst du doppelte Karten gegen ein Päckchen oder eine Belohnung. Tippe bei der Seltenheit auf „Tauschen“, du siehst, welche Karten du abgibst, und bestätigst. Die erste Karte jeder Sorte bleibt immer in deinem Album.']],
   stats:['Statistik',[
     'Wörter: Anzahl aller Vokabeln in dieser Sprache.',
     'Sicher gelernt: Wörter, die du mehrmals hintereinander richtig hattest und die nur noch selten abgefragt werden.',
@@ -1007,7 +1044,7 @@ const HELP={
     'Der Bereich ist mit einer PIN geschützt. „Sperren“ schließt ihn wieder.',
     'Kind wechseln: Tippe oben auf den Namen neben „Elternbereich“ und wähle das Kind. Dort kannst du auch ein weiteres Kind anlegen.',
     'Alle Sprachen / Einzelne Sprache: Bei „Alle Sprachen“ gelten Punkte & Abfrage für jede Sprache. Bei „Einzelne Sprache“ wählst du im Dropdown die Sprache und kannst deren Vokabeln, Karten und Belohnungen bearbeiten.',
-    'Seiten: Oben wechselst du zwischen Sprachen (Sprachen, Vokabeln, zu schwere Wörter), Karten (Karten, Kartenrücken), Lernen & Belohnungen (Punkte & Abfrage, Serie, Spezielle Belohnungen, Lernpause) und Administration (Kinder, Abgleich, Sicherung & PIN).',
+    'Seiten: Oben wechselst du zwischen Sprachen (Sprachen, Vokabeln, zu schwere Wörter), Karten (Karten, Kartenrücken), Lernen & Belohnungen (Punkte & Abfrage, Serie, Karten tauschen, Spezielle Belohnungen, Lernpause) und Administration (Kinder, Abgleich, Sicherung & PIN).',
     'Hilfe: „? Hilfe“ erklärt alles auf der aktuellen Seite.',
     'Zwei Handys: Unter „Abgleich mit anderem Handy“ gleichst du Vokabeln, Lernstand und Einstellungen per Datei ab.',
     'Einmal im Monat sollte unter Administration → „Sicherung & PIN“ eine Sicherung gespeichert werden.']],
@@ -1050,6 +1087,12 @@ const HELP={
     'Belohnung: Päckchen, Big-Pack (5 Karten), Mega-Pack (7 Karten), Epic-Pack (3 epische Karten), Legend-Pack (1 legendäre Karte) oder eine spezielle Belohnung.',
     'Nächste Serie: Eine eigene Belohnung, die einmalig die Standard-Belohnung ersetzt.',
     'Die Belohnung geht an die Sprache, mit der zuletzt geübt wurde.']],
+  trade:['Karten tauschen',[
+    'Tauschen erlaubt: Schaltet das Tauschen im Album des Kindes ein oder aus.',
+    'Doppelte Karten: Pro Seltenheit stellst du ein, wie viele doppelte Karten ein Tausch kostet (Standard 3). Als doppelt zählen nur Karten über die erste hinaus; die erste bleibt immer im Album.',
+    'Welche Karten: Abgegeben werden Doppelte derselben Seltenheit, zuerst von den Karten, die das Kind am häufigsten hat. Vor dem Tausch sieht das Kind die Liste und bestätigt einmal.',
+    'Gegenwert: Päckchen (Anzahl einstellbar), Big-Pack, Mega-Pack, Epic-Pack, Legend-Pack oder eine spezielle Belohnung. Päckchen landen wie bei der Serie als offene Päckchen, spezielle Belohnungen unter „Gewonnen, noch nicht eingelöst“.',
+    'Abgleich: Die Einstellungen werden mit dem anderen Handy abgeglichen. Karten und Album bleiben auf jedem Handy für sich, daher wird beim Abgleich nichts doppelt gutgeschrieben.']],
   pomo:['Lernpause',[
     'Nach der eingestellten Lernzeit sperrt die App nach der Runde für eine Pause („Mach mal Pause!“).',
     'Lernzeit, Pausenlänge und Leerlauf-Zeit lassen sich einstellen.',
@@ -1072,7 +1115,7 @@ const HELP={
     'Die PIN gilt für alle Kinder.']],
   sync:['Abgleich mit anderem Handy',[
     'Wofür: Das Kind lernt auf seinem Handy, die Eltern pflegen Vokabeln und Einstellungen auf ihrem. Mit dem Abgleich bekommen beide Handys denselben Stand, ohne Konto und ohne Internet-Dienst.',
-    'Was abgeglichen wird: Sprachen, Vokabeln mit Tags, Lernstand der Wörter, Punkte, Päckchen, Statistik, Serie, „Zu schwer“-Meldungen und Pausieren, Spezielle Belohnungen (auch gewonnene und eingelöste), Serien-Belohnung, Lernpause sowie Punkte & Abfrage.',
+    'Was abgeglichen wird: Sprachen, Vokabeln mit Tags, Lernstand der Wörter, Punkte, Päckchen, Statistik, Serie, „Zu schwer“-Meldungen und Pausieren, Spezielle Belohnungen (auch gewonnene und eingelöste), Serien-Belohnung, Karten tauschen, Lernpause sowie Punkte & Abfrage.',
     'Was nicht abgeglichen wird: Bilder, Karten und Album, Kartenrücken, Päckchenbild, Farbschema und die Eltern-PIN. Sie bleiben auf jedem Handy für sich.',
     'Senden: „Abgleich-Datei senden“ öffnet das Teilen-Menü (z. B. WhatsApp an dich selbst oder an das andere Handy). Ohne Teilen-Menü wird die Datei gespeichert.',
     'Laden: Auf dem anderen Handy die Datei speichern und mit „Abgleich-Datei laden“ auswählen, oder sie im Teilen-Menü direkt an „Wörter-Sammler“ schicken. Es erscheint eine Vorschau mit allen Änderungen. Erst „Abgleichen“ übernimmt sie.',
@@ -1312,6 +1355,7 @@ function vAlbum(){
   const wins=L.wins.slice().reverse();
   return `${langChips()}<div class="row spread"><h2>Album</h2><span class="pill">${have} / ${L.cards.length} Karten</span></div>
   ${missingImgs(L)?`<div class="panel"><p style="margin:0"><b>Bei ${missingImgs(L)} Karten fehlt das Bild.</b> Mama oder Papa können es im Elternbereich unter „Karten“ wiederherstellen.</p></div>`:''}
+  ${tradePanel(L)}
   ${wins.length?`<div class="panel"><h3>Meine Belohnungen</h3>${wins.map(w=>`<div class="urow"><div class="t"><b>${esc(w.text)}</b><div class="note">${fmtDate(w.ts)} · ${winLabel(w)}</div></div><span class="pill ${w.redeemed?'ok':'gold'}">${w.redeemed?'eingelöst':'offen'}</span></div>`).join('')}</div>`:''}
   ${L.cards.length?`<div class="grid" style="margin-top:12px">${L.cards.map((c,i)=>{const n=L.owned[c.id]||0;
     return n>0?`<button class="tile" data-a="view-card" data-id="${c.id}">${cardFace(c,false,n)}</button>`
@@ -1319,6 +1363,15 @@ function vAlbum(){
   :`<div class="panel center"><p><b>Hier sammelst du bald Karten!</b></p><p class="muted">Lerne Vokabeln, sammle Punkte und öffne Päckchen. Mama oder Papa fügen die Karten im Elternbereich hinzu.</p></div>`}`;
 }
 
+function tradePanel(L){
+  const t=S.tradeCfg;if(!t.active||!L.cards.length)return '';
+  const pz=tradePrize(t,S.rewards),dup=tradeDups(L),rs=RARITIES.filter(r=>L.cards.some(c=>c.rarity===r.k));
+  return `<div class="panel"><h3>Doppelte Karten tauschen</h3>
+  ${pz?`<p class="note" style="margin-top:0">Tausche doppelte Karten gegen <b>${esc(pz.kind==='text'?pz.text:pz.label)}</b>. Die erste Karte jeder Sorte bleibt immer in deinem Album.</p>
+  ${rs.map(r=>{const need=t.need[r.k],have=dup[r.k];return `<div class="urow"><div class="t"><b>${r.label}</b><div class="note">${have} doppelt · ${need} für einen Tausch</div></div><button class="btn small ${have>=need?'primary':''}" data-a="trade-ask" data-r="${r.k}" ${have>=need?'':'disabled'}>Tauschen</button></div>`;}).join('')}
+  ${packCount(L)>0?`<button class="btn gold block" style="margin-top:10px" data-a="open-pack">Päckchen öffnen (${packCount(L)})</button>`:''}`
+  :'<p class="note" style="margin:0">Mama oder Papa müssen im Elternbereich noch eine Belohnung für den Tausch einstellen.</p>'}</div>`;
+}
 function pBacks(L){
   return `<p class="note" style="margin:0 0 8px">Hier fügst du eigene Kartenrücken hinzu. Ausgewählt wird der Rücken in den Optionen, getrennt für jede Sprache.</p>
   <label class="btn small block" for="backin">Eigenen Kartenrücken hinzufügen</label><input id="backin" type="file" accept="image/*" hidden data-change="backimg">
@@ -1328,7 +1381,7 @@ function confBtn(key,label,cls,attrs){const on=ui.confirm===key;return `<button 
 const rarOptions=sel=>RARITIES.map(r=>`<option value="${r.k}" ${sel===r.k?'selected':''}>${r.label}</option>`).join('');
 
 /* Elternbereich: vier Seiten mit festen Abschnitten (statt aufklappbarer Abschnitte) */
-const PPAGES=[['words','Sprachen',['lang','vocab','hard']],['cards','Karten',['cards','backs']],['rewards','Lernen & Belohnungen',['reward','streak','prizes','pomo']],['settings','Administration',['kids','sync','backup']]];
+const PPAGES=[['words','Sprachen',['lang','vocab','hard']],['cards','Karten',['cards','backs']],['rewards','Lernen & Belohnungen',['reward','streak','trade','prizes','pomo']],['settings','Administration',['kids','sync','backup']]];
 const pageOf=k=>{const p=PPAGES.find(x=>x[2].includes(k));return p?p[0]:'';};
 function vParent(){
   if(!ui.unlocked){
@@ -1359,7 +1412,7 @@ function vParent(){
   }else if(pg==='cards'){
     h+=one?sec('cards','Karten',L?pCards(L):noLang())+sec('backs','Kartenrücken',L?pBacks(L):noLang()):needOne('Karten &amp; Kartenrücken');
   }else if(pg==='rewards'){
-    h+=sec('reward','Punkte &amp; Abfrage',L?pReward(L):noLang())+sec('streak','Serien-Belohnung',pStreak());
+    h+=sec('reward','Punkte &amp; Abfrage',L?pReward(L):noLang())+sec('streak','Serien-Belohnung',pStreak())+sec('trade','Karten tauschen',pTrade());
     h+=one?sec('prizes','Spezielle Belohnungen',L?pPrizes(L):noLang()):needOne('Spezielle Belohnungen');
     h+=sec('pomo','Lernpause',pPomo());
   }else{
@@ -1467,6 +1520,20 @@ function pStreak(){
   <div class="field"><label for="sc-next">Belohnung</label><select id="sc-next" class="in" data-change="scfg" data-k="next"><option value="">– keine –</option><optgroup label="Päckchen">${Object.keys(SPECIAL_PACKS).map(k=>`<option value="pack:${k}" ${c.nextPack===k?'selected':''}>${SPECIAL_PACKS[k].name} (${SPECIAL_PACKS[k].desc})</option>`).join('')}</optgroup><optgroup label="Spezielle Belohnung">${S.rewards.map(r=>`<option value="${r.id}" ${r.id===c.nextRid?'selected':''}>${esc(r.text)}${r.active?'':' (pausiert)'}</option>`).join('')}</optgroup></select></div>
   </div>`;
 }
+function pTrade(){
+  const t=S.tradeCfg,pz=tradePrize(t,S.rewards);
+  const opt=(v,lab)=>`<option value="${v}" ${t.kind===v?'selected':''}>${lab}</option>`;
+  return `<div class="secbody">
+  <p class="note">Das Kind tauscht im Album doppelte Karten gegen eine Belohnung. Die erste Karte jeder Sorte bleibt immer im Album, abgegeben werden nur Doppelte derselben Seltenheit.</p>
+  <div class="urow"><div class="t"><b>Tauschen erlaubt</b></div><button class="tog ${t.active?'on':''}" data-a="toggle-trade">${t.active?'Aktiv':'Aus'}</button></div>
+  <h3 style="margin-top:14px">Doppelte Karten für einen Tausch</h3>
+  ${RARITIES.map(r=>`<div class="field"><label for="tc-${r.k}">${r.label}</label><input id="tc-${r.k}" class="in" type="number" inputmode="numeric" min="1" max="20" value="${t.need[r.k]}" data-change="tcfg" data-k="need" data-r="${r.k}"></div>`).join('')}
+  <h3 style="margin-top:14px">Gegenwert</h3>
+  <div class="field"><label for="tc-kind">Belohnung</label><select id="tc-kind" class="in" data-change="tcfg" data-k="kind">${opt('pack','Päckchen')}${Object.keys(SPECIAL_PACKS).map(k=>opt(k,`${SPECIAL_PACKS[k].name} (${SPECIAL_PACKS[k].desc})`)).join('')}${opt('text','Spezielle Belohnung')}</select></div>
+  ${t.kind!=='text'?`<div class="field"><label for="tc-packs">Anzahl</label><input id="tc-packs" class="in" type="number" inputmode="numeric" min="1" max="10" value="${t.packs}" data-change="tcfg" data-k="packs"></div>`
+   :`<div class="field"><label for="tc-rid">Spezielle Belohnung</label><select id="tc-rid" class="in" data-change="tcfg" data-k="rid">${rewardOpts(t.rid)}</select></div>${pz?'':`<p class="muted">${S.rewards.length?'Wähle eine aktive Belohnung aus.':'Lege erst unter „Spezielle Belohnungen“ eine an.'}</p>`}`}
+  </div>`;
+}
 function pReward(L){
   if(ui.pscope==='all')L=S.langs[0];
   const sl=[['auto','Automatisch (passend zur Sprache)'],['en-GB','Englisch (UK)'],['en-US','Englisch (US)'],['fr-FR','Französisch'],['es-ES','Spanisch'],['it-IT','Italienisch'],['tr-TR','Türkisch'],['pl-PL','Polnisch'],['ru-RU','Russisch'],['nl-NL','Niederländisch'],['pt-PT','Portugiesisch']];
@@ -1543,6 +1610,13 @@ function vModal(){
   if(ui.modal&&ui.modal.t==='help')return helpModal(ui.modal.k);
   const L=curLang(),m=ui.modal;if(!L)return '';
   const wrap=inner=>`<div class="modal" data-a="backdrop"><div class="mbox">${inner}</div></div>`;
+  if(m.t==='trade'){
+    const gave=tradePick(L,m.r,S.tradeCfg.need[m.r]),pz=tradePrize(S.tradeCfg,S.rewards);if(!gave||!pz)return '';
+    return wrap(`<h3>Karten tauschen?</h3>
+    <p>Du gibst ab:</p><ul class="helplist">${gave.map(g=>`<li>${esc(g.name)}${g.n>1?' ×'+g.n:''}</li>`).join('')}</ul>
+    <p>Du bekommst: <b>${esc(pz.kind==='text'?pz.text:pz.label)}</b></p>
+    <div class="row"><button class="btn primary grow" data-a="trade-go" data-r="${m.r}">Ja, tauschen</button><button class="btn grow" data-a="close-modal">Abbrechen</button></div>`);
+  }
   if(m.t==='word'){
     const w=L.vocab.find(x=>x.id===m.id);if(!w)return '';
     return wrap(`<h3>Wort bearbeiten</h3>
@@ -2151,6 +2225,11 @@ document.addEventListener('click',async e=>{
       const w=L.wins.find(x=>x.id===d.id);if(w){w.redeemed=true;w.redeemedTs=Date.now();save();render();}break;}
     case 'pomo-test':S.pomo={lock:true,until:tNow()+S.pomoCfg.brk*60000,start:Date.now(),idle:null};save();pomoTick();break;
     case 'pomo-reset':S.pomo=null;save();toast('Timer zurückgesetzt');render();break;
+    case 'toggle-trade':S.tradeCfg.active=!S.tradeCfg.active;save();render();break;
+    case 'trade-ask':if(L&&tradePick(L,d.r,S.tradeCfg.need[d.r]))ui.modal={t:'trade',r:d.r};render();break;
+    case 'trade-go':{if(!L)break;const res=tradeApply(L,S.tradeCfg,d.r,S.rewards,Date.now(),uid);ui.modal=null;
+      if(res.err){toast(res.err);render();break;}
+      save();render();confetti(24);toast(res.prize.kind==='text'?'Getauscht! Gewonnen: '+res.prize.text:'Getauscht! Du hast '+res.prize.label+' bekommen.');break;}
     case 'toggle-sdef':S.streakCfg.def.active=!S.streakCfg.def.active;save();render();break;
     case 'del-packimg':{if(!ask(d.key))break;await delImg(PACK_KEY);render();toast('Standard-Päckchen wird gezeigt');break;}
     case 'starter':addStarter();break;
@@ -2178,6 +2257,14 @@ document.addEventListener('change',async e=>{
   const L=curLang();
   if(k==='imprar')ui.imprar=el.value;
   else if(k==='pomo'){const key=el.dataset.k,lim={work:[1,90],brk:[1,30],idle:[1,30]}[key];if(lim){S.pomoCfg[key]=clamp(el.value,lim[0],lim[1]);save();render();}}
+  else if(k==='tcfg'){
+    const t=S.tradeCfg,key=el.dataset.k;
+    if(key==='need'&&t.need[el.dataset.r]!=null)t.need[el.dataset.r]=clamp(el.value,1,20);
+    else if(key==='kind')t.kind=(el.value==='text'||SPECIAL_PACKS[el.value])?el.value:'pack';
+    else if(key==='packs')t.packs=clamp(el.value,1,10);
+    else if(key==='rid')t.rid=el.value;
+    save();render();
+  }
   else if(k==='scfg'){
     const c=S.streakCfg,key=el.dataset.k;
     if(key==='days')c.days=clamp(el.value,1,365);
