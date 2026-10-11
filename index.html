@@ -61,9 +61,9 @@ button:focus-visible,.in:focus-visible,.chip:focus-visible{outline:3px solid var
 .chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
 .seg3{grid-template-columns:1fr 1fr 1fr}
-.ptabs{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:10px 0 6px;border-bottom:2px solid var(--line)}
-.ptabs button{appearance:none;border:0;background:none;color:var(--muted);font:inherit;font-weight:800;font-size:12.5px;padding:6px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;min-height:56px}
-.ptabs button .pi{font-size:22px;line-height:1}.ptabs button{text-align:center;line-height:1.15}
+.ptabs{display:flex;gap:2px;margin:10px 0 6px;border-bottom:2px solid var(--line)}
+.ptabs button{appearance:none;border:0;background:none;color:var(--muted);font:inherit;font-weight:800;font-size:14px;padding:6px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;min-height:48px}
+.ptabs button{text-align:center;line-height:1.15;justify-content:center;flex:1 1 auto;padding-left:6px;padding-right:6px}
 .ptabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
 .psec{background:var(--surface);border-radius:16px;box-shadow:var(--shadow);margin-top:14px;padding:14px 16px 4px;scroll-margin-top:12px}.psec>h3{margin:0 0 6px;font-size:19px}
 .psec .secbody{background:none;box-shadow:none;padding:0 0 12px;margin:0;border-radius:0}
@@ -1328,7 +1328,7 @@ function confBtn(key,label,cls,attrs){const on=ui.confirm===key;return `<button 
 const rarOptions=sel=>RARITIES.map(r=>`<option value="${r.k}" ${sel===r.k?'selected':''}>${r.label}</option>`).join('');
 
 /* Elternbereich: vier Seiten mit festen Abschnitten (statt aufklappbarer Abschnitte) */
-const PPAGES=[['words','Sprachen',['lang','vocab','hard'],'📚'],['cards','Karten',['cards','backs'],'🃏'],['rewards','Lernen & Belohnungen',['reward','streak','prizes','pomo'],'🎁'],['settings','Administration',['kids','sync','backup'],'⚙️']];
+const PPAGES=[['words','Sprachen',['lang','vocab','hard']],['cards','Karten',['cards','backs']],['rewards','Lernen & Belohnungen',['reward','streak','prizes','pomo']],['settings','Administration',['kids','sync','backup']]];
 const pageOf=k=>{const p=PPAGES.find(x=>x[2].includes(k));return p?p[0]:'';};
 function vParent(){
   if(!ui.unlocked){
@@ -1347,7 +1347,7 @@ function vParent(){
   const pg=PPAGES.some(x=>x[0]===ui.ppage)?ui.ppage:'words';ui.ppage=pg;
   let h=`<div class="row spread"><h2>Elternbereich <button class="pill kidpill" data-a="kid-menu" aria-expanded="${!!ui.kidMenu}" aria-label="Kind wechseln">${esc(kidLabel(S.kidName))} ${ui.kidMenu?'▲':'▼'}</button></h2><span class="row" style="gap:8px">${helpBtn('page:'+pg)}<button class="btn small" data-a="lock">Sperren</button></span></div>`;
   if(ui.kidMenu)h+=`<div class="themelist kidmenu">${PROF.list.map(p=>{const on=p.key===PROF.cur;return `<button class="theme ${on?'on':''}" data-a="kid-switch" data-k="${esc(p.key)}">${on?'✓ ':''}${esc(kidLabel(on?S.kidName:p.name))}</button>`;}).join('')}<button class="theme" data-a="kid-new">+ Weiteres Kind anlegen</button></div>`;
-  h+=`<div class="ptabs" role="tablist" aria-label="Seiten">${PPAGES.map(([k,t,,ic])=>`<button role="tab" aria-selected="${pg===k}" class="${pg===k?'on':''}" data-a="ppage" data-p="${k}"><span class="pi" aria-hidden="true">${ic}</span>${esc(t)}</button>`).join('')}</div>`;
+  h+=`<div class="ptabs" role="tablist" aria-label="Seiten">${PPAGES.map(([k,t])=>`<button role="tab" aria-selected="${pg===k}" class="${pg===k?'on':''}" data-a="ppage" data-p="${k}">${esc(t)}</button>`).join('')}</div>`;
   if(pg!=='settings')h+=scopeBar();
   if(L&&(L.cards.length||L.vocab.length)&&(!S.lastBackup||Date.now()-S.lastBackup>14*864e5))h+=`<div class="busy">Die letzte Sicherung ist ${S.lastBackup?'älter als 14 Tage':'noch nicht gemacht'}. Bitte eine Sicherung speichern, damit Karten und Fortschritt nicht verloren gehen.${pg==='settings'?'':`<div style="margin-top:8px"><button class="btn small" data-a="ppage" data-p="settings" data-s="backup">Zur Sicherung</button></div>`}</div>`;
   const one=ui.pscope!=='all',needOne=t=>`<section class="psec"><h3>${t}</h3><p class="note" style="margin:0 0 10px">Gehört zu einer Sprache. Wähle oben „Einzelne Sprache“.</p></section>`;

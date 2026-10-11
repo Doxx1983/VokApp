@@ -6,7 +6,7 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 ## Arbeitsweise
 - Antworten an Dominic: Deutsch, kurz und präzise.
 - Commit-Trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` und `Claude-Session: <Session-URL>`. Push: `git push -q origin main`.
-- Nach jeder Änderung: `sw.js` Cache-Version `woerter-sammler-vNN` erhöhen (aktuell v53), Tests laufen lassen, committen, pushen. Nutzer muss die App danach einmal neu laden.
+- Nach jeder Änderung: `sw.js` Cache-Version `woerter-sammler-vNN` erhöhen (aktuell v54), Tests laufen lassen, committen, pushen. Nutzer muss die App danach einmal neu laden.
 - Tests (Node, ohne Abhängigkeiten): `node tests/logic.test.js`, `tests/stats.test.js`, `tests/pomo.test.js`, `tests/sync.test.js`, `tests/smoke.js` (VM mit DOM-Stubs). `node --check` auf das extrahierte Script. Neue Features immer im Smoke-Test abdecken.
 - `pkill -f` nicht verwenden (beendet die eigene Shell).
 
