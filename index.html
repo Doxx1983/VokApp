@@ -78,6 +78,7 @@ button:focus-visible,.in:focus-visible,.chip:focus-visible{outline:3px solid var
 .stat{background:var(--surface);border-radius:14px;padding:10px;text-align:center;box-shadow:var(--shadow)}
 .stat b{display:block;font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
 .stat span{font-size:13px;color:var(--muted);font-weight:700}
+.kidpill{border:0;cursor:pointer;font:inherit;font-size:14px;font-weight:800;vertical-align:middle}.kidmenu{margin:0 0 12px}
 .pill{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--ink);border-radius:99px;padding:4px 12px;font-weight:800;font-size:14px}
 .pill.gold{background:var(--warn-bg);color:var(--warn)}
 .pill.ok{background:var(--good-bg);color:var(--good)}
@@ -998,6 +999,7 @@ const HELP={
     'Abgleich mit Mama und Papa: „Abgleich-Datei senden“ schickt deinen Lernstand, z. B. per WhatsApp. Mit „Abgleich-Datei laden“ holst du neue Vokabeln und Einstellungen von Mama oder Papa. Du siehst vorher, was sich ändert, und tippst dann auf „Abgleichen“.']],
   parent:['Elternbereich',[
     'Der Bereich ist mit einer PIN geschützt. „Sperren“ schließt ihn wieder.',
+    'Kind wechseln: Tippe oben auf den Namen neben „Elternbereich“ und wähle das Kind. Dort kannst du auch ein weiteres Kind anlegen.',
     'Alle Sprachen / Einzelne Sprache: Bei „Alle Sprachen“ gelten Punkte & Abfrage für jede Sprache. Bei „Einzelne Sprache“ wählst du im Dropdown die Sprache und kannst deren Vokabeln, Karten und Belohnungen bearbeiten.',
     'Tippe auf einen Abschnitt, um ihn zu öffnen. Bei jedem Abschnitt gibt es eine eigene Hilfe.',
     'Zwei Handys: Unter „Abgleich mit anderem Handy“ gleichst du Vokabeln, Lernstand und Einstellungen per Datei ab.',
@@ -1325,7 +1327,9 @@ function vParent(){
       <button class="btn primary block" data-a="pin-go">Entsperren</button></div>`;
   }
   const L=curLang();
-  let h=`<div class="row spread"><h2>Elternbereich${PROF.list.length>1?` <span class="pill">${esc(kidLabel(S.kidName))}</span>`:''}</h2><span class="row" style="gap:8px">${helpBtn('parent')}<button class="btn small" data-a="lock">Sperren</button></span></div>${scopeBar()}`;
+  let h=`<div class="row spread"><h2>Elternbereich <button class="pill kidpill" data-a="kid-menu" aria-expanded="${!!ui.kidMenu}" aria-label="Kind wechseln">${esc(kidLabel(S.kidName))} ${ui.kidMenu?'▲':'▼'}</button></h2><span class="row" style="gap:8px">${helpBtn('parent')}<button class="btn small" data-a="lock">Sperren</button></span></div>`;
+  if(ui.kidMenu)h+=`<div class="themelist kidmenu">${PROF.list.map(p=>{const on=p.key===PROF.cur;return `<button class="theme ${on?'on':''}" data-a="kid-switch" data-k="${esc(p.key)}">${on?'✓ ':''}${esc(kidLabel(on?S.kidName:p.name))}</button>`;}).join('')}<button class="theme" data-a="kid-new">+ Weiteres Kind anlegen</button></div>`;
+  h+=scopeBar();
   if(L&&(L.cards.length||L.vocab.length)&&(!S.lastBackup||Date.now()-S.lastBackup>14*864e5))h+=`<div class="busy">Die letzte Sicherung ist ${S.lastBackup?'älter als 14 Tage':'noch nicht gemacht'}. Bitte unter „Sicherung &amp; PIN“ eine Sicherung speichern, damit Karten und Fortschritt nicht verloren gehen.</div>`;
   h+=secBtn('lang','Sprachen');if(ui.sec==='lang')h+=pLang();
   if(ui.pscope==='all')h+=`<p class="note">Vokabeln, Karten, Kartenrücken und Spezielle Belohnungen gehören zu einer Sprache. Wähle dafür „Einzelne Sprache“.</p>`;
@@ -2123,7 +2127,9 @@ document.addEventListener('click',async e=>{
     case 'sync-shared':{const t=ui.sharedSync;ui.sharedSync=null;const err=t?readSync(t,false):'';if(err)toast(err);render();break;}
     case 'sync-pick':{const c=ui.syncChoose;if(!c)break;const err=prepSync(c,d.k,true,false);if(err)toast(err);render();break;}
     case 'sync-new':{const c=ui.syncChoose;if(!c)break;addProfile(c.name||'',c.pid,true);const err=prepSync(c,PROF.cur,false,false);if(err)toast(err);render();toast('Neues Kind angelegt');break;}
-    case 'kid-switch':switchProfile(d.k);render();toast('Ausgewählt: '+kidLabel(S.kidName));break;
+    case 'kid-menu':ui.kidMenu=!ui.kidMenu;render();break;
+    case 'kid-new':ui.kidMenu=false;ui.sec='kids';render();setTimeout(()=>{const i=$('#newkid');if(i&&i.focus)i.focus();},0);break;
+    case 'kid-switch':{ui.kidMenu=false;const same=d.k===PROF.cur;switchProfile(d.k);render();if(!same)toast('Ausgewählt: '+kidLabel(S.kidName));break;}
     case 'kid-add':{const n=val('#newkid');if(!n){toast('Bitte einen Namen eingeben.');break;}addProfile(n);ui.sec='kids';render();toast(n+' angelegt');break;}
     case 'kid-del':{if(!ask(d.key))break;await delProfile(d.key.slice('kid-del:'.length));render();toast('Kind gelöscht');break;}
     case 'sync-undo':{if(!ask(d.key))break;undoSync();break;}
@@ -2201,7 +2207,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 window.addEventListener('pagehide',()=>save());
 window.addEventListener('popstate',e=>{
   if(!S.pinHash||(S.pomo&&S.pomo.lock)){pushHist();return;}
-  if(ui.modal||ui.catOpen||ui.themeOpen||ui.confirm){ui.modal=null;ui.catOpen='';ui.themeOpen=false;ui.confirm=null;pushHist();render();return;}
+  if(ui.modal||ui.catOpen||ui.themeOpen||ui.confirm||ui.kidMenu){ui.modal=null;ui.catOpen='';ui.themeOpen=false;ui.confirm=null;ui.kidMenu=false;pushHist();render();return;}
   let v=(e.state&&e.state.v)||'home';
   if(!({home:1,list:1,album:1,stats:1,options:1,parent:1})[v])v='home';
   if(Q&&Q.listening)stopListen();

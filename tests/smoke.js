@@ -320,6 +320,10 @@ const test=`
   ui.view='parent';ui.sec='kids';render();
   const benKey=PROF.list.find(p=>p.name==='Ben').key;await click({a:'kid-del',key:'kid-del:'+benKey});await click({a:'kid-del',key:'kid-del:'+benKey});
   assert.equal(PROF.list.length,2);assert(!localStorage.getItem(benKey),'Ben gelöscht');
+  await click({a:'kid-menu'});assert(app().includes('kidmenu')&&app().includes('Weiteres Kind anlegen'),'Menü über den Namen');
+  await click({a:'kid-switch',k:PROF.list.find(p=>p.name==='Mia').key});assert(!ui.kidMenu&&!app().includes('kidmenu'),'Menü schließt');
+  assert(app().includes('data-a="kid-menu"')&&app().includes('Mia ▼'),'Name oben antippbar');
+  await click({a:'kid-menu'});await click({a:'kid-new'});assert(ui.sec==='kids'&&!ui.kidMenu);
   await click({a:'kid-switch',k:PROF.list.find(p=>p.name==='Mia').key});assert.equal(S.kidName,'Mia');assert.equal(curLang().vocab.length,miaWords,'Mias Daten unverändert');
   ui.unlocked=false;ui.view='home';render();}
  // Altdaten migrieren
