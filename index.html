@@ -548,6 +548,7 @@ function streakDue(count,days){return count>0&&days>0&&count%days===0;}
 function nextStreakTarget(count,days){return (Math.floor(count/days)+1)*days;}
 function migrate(s){
   s.mode=s.mode==='speak'?'speak':'write';
+  s.mt=s.mt&&typeof s.mt==='object'?s.mt:{};s.del=s.del&&typeof s.del==='object'?s.del:{};s.dev=s.dev||'d'+Math.random().toString(36).slice(2,10);
   s.rewards=Array.isArray(s.rewards)?s.rewards:[];
   s.cardBack=Math.min(Math.max(Math.round(+s.cardBack)||1,1),BACKS.length);
   s.customBacks=(Array.isArray(s.customBacks)?s.customBacks:[]).filter(b=>b&&typeof b.id==='string'&&b.id).map(b=>({id:b.id,name:String(b.name||'Eigener Rücken').slice(0,30)}));
@@ -567,6 +568,7 @@ function migrate(s){
     l.speechLang=(!l.speechLang||l.speechLang==='auto'||l.speechLang===speechLangFor(l.name))?'auto':l.speechLang;
     l.goal=l.goal||100;l.ppr=l.ppr||10;l.packSize=l.packSize||3;l.sessionSize=Math.min(30,Math.max(10,Math.round((+l.sessionSize||10)/10)*10));l.dir=l.dir||'mix';
     l.vocab.forEach(w=>{w.tags=splitTags(Array.isArray(w.tags)?w.tags.join('#'):(w.unit||''));if(!w.tags.length)w.tags=['Allgemein'];delete w.unit;});
+    l.gifts=Array.isArray(l.gifts)?l.gifts:[];
     l.points=l.points||0;l.packs=l.packs||0;l.sp=(Array.isArray(l.sp)?l.sp:[]).filter(t=>SPECIAL_PACKS[t]);l.totalPoints=l.totalPoints||0;
   });
   if(!s.langs.find(l=>l.id===s.activeLang)) s.activeLang=s.langs[0]?s.langs[0].id:null;
@@ -612,6 +614,150 @@ function pomoStep(p,now,inQuiz,tnow,cfg){
 }
 function pomoOnStart(p,now,cfg){p=pomoStep(p,now,false,0,cfg);if(p&&p.lock)return p;return p?{...p,idle:null}:{start:now,idle:null};}
 function pomoOnEnd(p,now){return p&&!p.lock?{...p,idle:now}:p;}
+/* Abgleich zwischen zwei Handys (Sync-Datei, ohne Server).
+   Zeitstempel entstehen automatisch: save() vergleicht mit dem letzten Stand (syncSig) und stempelt geänderte Gruppen (syncStamp).
+   Wort: mt = Inhalt, ht = „Zu schwer“-Meldung, lt = Lernstand. Sprache: smt = Einstellungen, pmt = Punkte/Päckchen.
+   Global: S.mt[streakCfg|pomoCfg], Belohnung r.mt. Gelöschtes: S.del[id oder Schlüssel] = Zeitpunkt.
+   Geräteeigen (nicht abgeglichen): PIN, Lernpause-Sperre, Farbschema, Modus, Kartenrücken, Karten/Album/Bilder. */
+const SYNC_W={mt:['f','d','tags','off'],ht:['hard','hardTs'],lt:['box','due','seen','right','wrong']};
+const SYNC_L=['name','dir','sessionSize','goal','packSize','ppr','speechLang'];
+const SYNC_G={streakCfg:'Serien-Belohnung',pomoCfg:'Lernpause'};
+const SYNC_LOCAL_L=['cards','owned','back'];
+const sjs=v=>JSON.stringify(v===undefined?null:v);
+const spick=(o,ks)=>sjs(ks.map(k=>o[k]));
+const giftSum=L=>(L.gifts||[]).reduce((a,g)=>a+(+g.n||0),0);
+const progSig=L=>sjs([L.points,L.totalPoints,(L.packs||0)-giftSum(L),L.sp]);
+const wKey=(lname,w)=>'w:'+norm(lname)+':'+norm(w.f)+'='+norm(w.d);
+const lKey=name=>'l:'+norm(name);
+const sameId=(a,b)=>a.id===b.id||(a.aka||[]).includes(b.id)||(b.aka||[]).includes(a.id);
+const delTs=(del,ids)=>Math.max(0,...ids.map(i=>+del[i]||0));
+const idsOf=(x,key)=>[x.id,...(x.aka||[]),key];
+function syncSig(s){
+  const sig={g:{},r:{},l:{}};
+  for(const k in SYNC_G)sig.g[k]=sjs(s[k]);
+  (s.rewards||[]).forEach(r=>{const c={...r};delete c.mt;sig.r[r.id]=sjs(c);});
+  (s.langs||[]).forEach(L=>{
+    const w={};(L.vocab||[]).forEach(x=>{w[x.id]={k:wKey(L.name,x),a:x.aka||[],mt:spick(x,SYNC_W.mt),ht:spick(x,SYNC_W.ht),lt:spick(x,SYNC_W.lt)};});
+    sig.l[L.id]={k:lKey(L.name),a:L.aka||[],s:spick(L,SYNC_L),p:progSig(L),w};
+  });
+  return sig;
+}
+/* stempelt Änderungen seit prev mit now; gibt die neue Signatur zurück */
+function syncStamp(prev,s,now){
+  const cur=syncSig(s);if(!prev)return cur;
+  s.mt=s.mt||{};s.del=s.del||{};
+  const kill=ids=>ids.forEach(i=>{if(i)s.del[i]=now;});
+  for(const k in SYNC_G)if(prev.g[k]!==cur.g[k])s.mt[k]=now;
+  s.rewards.forEach(r=>{if(prev.r[r.id]!==cur.r[r.id])r.mt=now;});
+  for(const id in prev.r)if(!(id in cur.r))kill([id]);
+  s.langs.forEach(L=>{
+    const p=prev.l[L.id],c=cur.l[L.id];
+    if(!p){L.smt=now;L.vocab.forEach(w=>{w.mt=now;});return;}
+    if(p.s!==c.s)L.smt=now;
+    if(p.p!==c.p)L.pmt=now;
+    L.vocab.forEach(w=>{const pw=p.w[w.id],cw=c.w[w.id];
+      if(!pw){w.mt=now;return;}
+      for(const g in SYNC_W)if(pw[g]!==cw[g])w[g]=now;});
+    for(const id in p.w)if(!(id in c.w))kill([id,...p.w[id].a,p.w[id].k]);
+  });
+  for(const id in prev.l)if(!(id in cur.l))kill([id,...prev.l[id].a,prev.l[id].k]);
+  return cur;
+}
+/* Inhalt der Sync-Datei: alles Abgleichbare, ohne Bilder, Karten und geräteeigene Werte */
+function syncPayload(s,now){
+  const st={mt:s.mt||{},del:s.del||{},streak:s.streak,rewards:s.rewards,langs:s.langs.map(L=>{const c={...L};SYNC_LOCAL_L.forEach(k=>delete c[k]);return c;})};
+  for(const k in SYNC_G)st[k]=s[k];
+  return {app:'woerter-sammler',kind:'sync',v:1,dev:s.dev,ts:now,state:st};
+}
+/* führt den Stand eines anderen Handys (rem) in eine Kopie des eigenen (loc) ein; gibt {state,ch} zurück */
+function syncMerge(loc,rem,now){
+  const s=JSON.parse(JSON.stringify(loc)),r=JSON.parse(JSON.stringify(rem));
+  s.mt=s.mt||{};s.del=s.del||{};const rmt=r.mt||{},rdel=r.del||{};
+  const ch={g:[],langs:[],langsDel:[],rewards:0,wins:0,streak:false,n:0};
+  const add=(o,k,n)=>{o[k]=(o[k]||0)+(n==null?1:n);ch.n+=(n==null?1:n);};
+  for(const k in SYNC_G){
+    if((+rmt[k]||0)>(+s.mt[k]||0)){if(sjs(r[k])!==sjs(s[k])&&r[k]){s[k]=r[k];ch.g.push(SYNC_G[k]);ch.n++;}s.mt[k]=rmt[k];}
+  }
+  /* Sprachen */
+  const lmap={},seen=new Set();
+  (r.langs||[]).forEach(RL=>{
+    const LL=s.langs.find(l=>!seen.has(l)&&sameId(l,RL))||s.langs.find(l=>!seen.has(l)&&norm(l.name)===norm(RL.name));
+    if(!LL){
+      const t=delTs(s.del,idsOf(RL,lKey(RL.name)));if(t>0&&t>=Math.max(+RL.smt||0,+RL.pmt||0))return;
+      const nl={...RL,cards:[],owned:{}};delete nl.back;s.langs.push(nl);seen.add(nl);lmap[RL.id]=nl.id;
+      ch.langs.push({name:RL.name,isNew:true,add:RL.vocab.length,upd:0,del:0,learn:0,prog:false,set:false});ch.n++;return;
+    }
+    seen.add(LL);lmap[RL.id]=LL.id;
+    if(LL.id!==RL.id&&!(LL.aka||[]).includes(RL.id))LL.aka=[...(LL.aka||[]),RL.id];
+    const c={name:LL.name,isNew:false,add:0,upd:0,del:0,learn:0,prog:false,set:false};
+    if((+RL.smt||0)>(+LL.smt||0)){if(spick(RL,SYNC_L)!==spick(LL,SYNC_L)){SYNC_L.forEach(k=>{if(RL[k]!==undefined)LL[k]=RL[k];});c.set=true;ch.n++;}LL.smt=RL.smt;}
+    /* Punkte & Päckchen: neuerer Stand zählt, Geschenke beider Seiten bleiben erhalten */
+    const lg=new Set((LL.gifts||[]).map(g=>g.id)),rg=new Set((RL.gifts||[]).map(g=>g.id));
+    const before=sjs([LL.points,LL.packs,LL.sp,LL.totalPoints]);
+    const remNewer=(+RL.pmt||0)>(+LL.pmt||0)||((+RL.pmt||0)===(+LL.pmt||0)&&(RL.totalPoints||0)>(LL.totalPoints||0));
+    if(remNewer){
+      LL.packs=(RL.packs||0)+(LL.gifts||[]).filter(g=>!rg.has(g.id)).reduce((a,g)=>a+(+g.n||0),0);
+      LL.points=RL.points||0;LL.sp=(RL.sp||[]).slice();LL.pmt=RL.pmt||LL.pmt;
+    }else LL.packs=(LL.packs||0)+(RL.gifts||[]).filter(g=>!lg.has(g.id)).reduce((a,g)=>a+(+g.n||0),0);
+    LL.totalPoints=Math.max(LL.totalPoints||0,RL.totalPoints||0);
+    LL.gifts=[...(LL.gifts||[]),...(RL.gifts||[]).filter(g=>!lg.has(g.id))];
+    if(sjs([LL.points,LL.packs,LL.sp,LL.totalPoints])!==before){c.prog=true;ch.n++;}
+    /* Lernprotokoll: je Tag und Wert der größere */
+    LL.log=LL.log||{};
+    for(const d in (RL.log||{})){const a=LL.log[d]||(LL.log[d]={}),b=RL.log[d];for(const f in b){if((+b[f]||0)>(+a[f]||0)){a[f]=b[f];c.prog=true;}}}
+    /* gewonnene Belohnungen: Vereinigung, eingelöst bleibt eingelöst */
+    LL.wins=LL.wins||[];
+    (RL.wins||[]).forEach(rw=>{const lw=LL.wins.find(x=>x.id===rw.id);
+      if(!lw){LL.wins.push(rw);add(ch,'wins');}
+      else if(rw.redeemed&&!lw.redeemed){lw.redeemed=true;lw.redeemedTs=rw.redeemedTs;add(ch,'wins');}});
+    /* Wörter */
+    const matched=new Set();
+    (RL.vocab||[]).forEach(RW=>{
+      const k=wKey(LL.name,RW);
+      const LW=LL.vocab.find(w=>!matched.has(w)&&sameId(w,RW))||LL.vocab.find(w=>!matched.has(w)&&wKey(LL.name,w)===k);
+      if(!LW){
+        const t=delTs(s.del,idsOf(RW,k));if(t>0&&t>=(+RW.mt||0))return;
+        LL.vocab.push(RW);matched.add(RW);add(c,'add');return;
+      }
+      matched.add(LW);
+      if(LW.id!==RW.id&&!(LW.aka||[]).includes(RW.id))LW.aka=[...(LW.aka||[]),RW.id];
+      let upd=false;
+      for(const g of ['mt','ht']){
+        if((+RW[g]||0)>(+LW[g]||0)){if(spick(RW,SYNC_W[g])!==spick(LW,SYNC_W[g])){SYNC_W[g].forEach(f=>{if(RW[f]===undefined)delete LW[f];else LW[f]=RW[f];});upd=true;}LW[g]=RW[g];}
+      }
+      if(upd)add(c,'upd');
+      const rl=+RW.lt||0,ll=+LW.lt||0;
+      if(rl>ll||(rl===ll&&(RW.seen||0)>(LW.seen||0))){if(spick(RW,SYNC_W.lt)!==spick(LW,SYNC_W.lt)){SYNC_W.lt.forEach(f=>{LW[f]=RW[f]===undefined?0:RW[f];});add(c,'learn');}LW.lt=RW.lt;}
+    });
+    LL.vocab=LL.vocab.filter(w=>{
+      if(matched.has(w))return true;
+      const t=delTs(rdel,idsOf(w,wKey(LL.name,w)));
+      if(t>0&&t>(+w.mt||0)){add(c,'del');return false;}return true;
+    });
+    if(c.add||c.upd||c.del||c.learn||c.prog||c.set)ch.langs.push(c);
+  });
+  s.langs=s.langs.filter(L=>{
+    if(seen.has(L))return true;
+    const t=delTs(rdel,idsOf(L,lKey(L.name)));
+    if(t>0&&t>Math.max(+L.smt||0,+L.pmt||0)){ch.langsDel.push(L.name);ch.n++;return false;}return true;
+  });
+  /* Spezielle Belohnungen */
+  const rmap=x=>x.lang==='all'?x:{...x,lang:lmap[x.lang]||x.lang};
+  (r.rewards||[]).forEach(rr=>{
+    const lr=s.rewards.find(x=>x.id===rr.id);rr=rmap(rr);
+    if(!lr){const t=delTs(s.del,[rr.id]);if(t>0&&t>=(+rr.mt||0))return;s.rewards.push(rr);add(ch,'rewards');return;}
+    if((+rr.mt||0)>(+lr.mt||0)){const a={...lr},b={...rr};delete a.mt;delete b.mt;if(sjs(a)!==sjs(b))add(ch,'rewards');Object.keys(lr).forEach(k=>delete lr[k]);Object.assign(lr,rr);}
+  });
+  s.rewards=s.rewards.filter(x=>{const t=delTs(rdel,[x.id]);if(t>0&&t>(+x.mt||0)){add(ch,'rewards');return false;}return true;});
+  /* Serie: späterer Lerntag zählt, Rekord = größerer Wert */
+  const a=s.streak||{last:null,count:0},b=r.streak||{last:null,count:0};
+  if(b.last&&(!a.last||b.last>a.last||(b.last===a.last&&(b.count||0)>(a.count||0)))){a.last=b.last;a.count=b.count||0;ch.streak=true;ch.n++;}
+  a.best=Math.max(a.best||0,b.best||0,a.count||0);s.streak=a;
+  /* Löschliste vereinigen, sehr alte Einträge vergessen */
+  for(const id in rdel)s.del[id]=Math.max(+s.del[id]||0,+rdel[id]||0);
+  for(const id in s.del)if(now-s.del[id]>400*DAY)delete s.del[id];
+  return {state:s,ch};
+}
 //LOGIC-END
 
 /* ================= Hilfen ================= */
@@ -648,7 +794,9 @@ function load(){
   return seed();
 }
 let S=load();
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Speichern nicht möglich');}}
+/* SIG: letzter gespeicherter Stand für die Zeitstempel des Abgleichs (syncStamp) */
+let SIG=syncSig(S);
+function save(){try{SIG=syncStamp(SIG,S,Date.now());localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Speichern nicht möglich');}}
 const curLang=()=>S.langs.find(l=>l.id===S.activeLang)||S.langs[0]||null;
 const unitsOf=L=>[...new Set(L.vocab.flatMap(tagsOf))].sort(new Intl.Collator('de',{sensitivity:'base',numeric:true}).compare);
 const hasTag=(w,t)=>tagsOf(w).includes(t);
@@ -722,7 +870,7 @@ function starterBlob(emoji,color){
 }
 
 /* ================= Zustand der Oberfläche ================= */
-const ui={view:'home',selMode:false,cardSel:[],setupErr:'',lockErr:'',lockPin:false,sm:'p',sg:'d',unit:[],catOpen:'',pscope:'one',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
+const ui={pendingSync:null,view:'home',selMode:false,cardSel:[],setupErr:'',lockErr:'',lockPin:false,sm:'p',sg:'d',unit:[],catOpen:'',pscope:'one',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
 let Q=null,deferredInstall=null,confirmT,rec=null;
 
 /* ================= Hilfe ================= */
@@ -774,6 +922,7 @@ const HELP={
     'Der Bereich ist mit einer PIN geschützt. „Sperren“ schließt ihn wieder.',
     'Alle Sprachen / Einzelne Sprache: Bei „Alle Sprachen“ gelten Punkte & Abfrage für jede Sprache. Bei „Einzelne Sprache“ wählst du im Dropdown die Sprache und kannst deren Vokabeln, Karten und Belohnungen bearbeiten.',
     'Tippe auf einen Abschnitt, um ihn zu öffnen. Bei jedem Abschnitt gibt es eine eigene Hilfe.',
+    'Zwei Handys: Unter „Abgleich mit anderem Handy“ gleichst du Vokabeln, Lernstand und Einstellungen per Datei ab.',
     'Einmal im Monat sollte unter „Sicherung & PIN“ eine Sicherung gespeichert werden.']],
   lang:['Sprachen',[
     'Lege hier Sprachen an, z. B. „Französisch“.',
@@ -827,6 +976,17 @@ const HELP={
     'Abfrage beim Schreiben: Richtung der Abfrage (Fremdwort → Deutsch, Deutsch → Fremdwort oder gemischt).',
     'Spracherkennung: Sprache für den Sprechen-Modus, meist automatisch.',
     '1 Päckchen schenken: Gibt der Sprache sofort ein Päckchen.']],
+  sync:['Abgleich mit anderem Handy',[
+    'Wofür: Das Kind lernt auf seinem Handy, die Eltern pflegen Vokabeln und Einstellungen auf ihrem. Mit dem Abgleich bekommen beide Handys denselben Stand, ohne Konto und ohne Internet-Dienst.',
+    'Was abgeglichen wird: Sprachen, Vokabeln mit Tags, Lernstand der Wörter, Punkte, Päckchen, Statistik, Serie, „Zu schwer“-Meldungen und Pausieren, Spezielle Belohnungen (auch gewonnene und eingelöste), Serien-Belohnung, Lernpause sowie Punkte & Abfrage.',
+    'Was nicht abgeglichen wird: Bilder, Karten und Album, Kartenrücken, Päckchenbild, Farbschema und die Eltern-PIN. Sie bleiben auf jedem Handy für sich.',
+    'Senden: „Abgleich-Datei senden“ öffnet das Teilen-Menü (z. B. WhatsApp an dich selbst oder an das andere Handy). Ohne Teilen-Menü wird die Datei gespeichert.',
+    'Laden: Auf dem anderen Handy die Datei speichern und mit „Abgleich-Datei laden“ auswählen, oder sie im Teilen-Menü direkt an „Wörter-Sammler“ schicken. Es erscheint eine Vorschau mit allen Änderungen. Erst „Abgleichen“ übernimmt sie.',
+    'Zusammenführen: Nichts wird einfach überschrieben. Bei jedem Wort und jeder Einstellung gilt die neuere Änderung, neue Wörter beider Handys bleiben erhalten, gelöschte werden auf beiden gelöscht. Geschenkte Päckchen gehen nicht verloren.',
+    'Danach zurückschicken: Damit beide Handys gleich sind, nach dem Abgleich vom zweiten Handy wieder eine Datei an das erste schicken und dort laden.',
+    'Sicherheit: Vor jedem Abgleich wird der alte Stand automatisch gesichert. „Letzten Abgleich rückgängig machen“ stellt ihn wieder her.',
+    'Erster Start: Am einfachsten die Sicherung vom Handy des Kindes einmal auf dem Eltern-Handy laden („Sicherung & PIN“). Danach nur noch abgleichen.',
+    'Tipp: Die Uhrzeit beider Handys sollte stimmen, weil die neuere Änderung gewinnt.']],
   backup:['Sicherung & PIN',[
     'App installieren: Legt die App als Symbol auf dem Startbildschirm an.',
     'Sicherung speichern: Erstellt eine Datei mit Wörtern, Karten, Bildern und Fortschritt. Bitte regelmäßig machen und sicher aufbewahren.',
@@ -1091,6 +1251,7 @@ function vParent(){
   h+=secBtn('streak','Serien-Belohnung');if(ui.sec==='streak')h+=pStreak();
   h+=secBtn('pomo','Lernpause');if(ui.sec==='pomo')h+=pPomo();
   h+=secBtn('reward','Punkte &amp; Abfrage');if(ui.sec==='reward')h+=L?pReward(L):noLang();
+  h+=secBtn('sync','Abgleich mit anderem Handy');if(ui.sec==='sync')h+=pSync();
   h+=secBtn('backup','Sicherung &amp; PIN');if(ui.sec==='backup')h+=pBackup();
   return h;
 }
@@ -1208,6 +1369,32 @@ function pReward(L){
   ${all?'':`<div class="field"><label for="s-sl">Spracherkennung beim Sprechen (automatisch: ${esc(resolveSpeechLang(L))})</label><select id="s-sl" class="in" data-change="set" data-k="speechLang">${sl.map(([v,t])=>`<option value="${v}" ${L.speechLang===v?'selected':''}>${t}</option>`).join('')}</select></div>`}
   <p class="note">Beim Sprechen wird immer das deutsche Wort vorgegeben. Mit den Standardwerten sind 10 richtige Antworten ein Päckchen mit 3 Karten. Seltenheit: Normal 62 %, Selten 26 %, Episch 10 %, Legendär 2 %.</p>
   ${all?'':'<button class="btn block" data-a="gift">1 Päckchen schenken</button>'}</div>`;
+}
+function syncPreview(p){
+  const c=p.ch,li=[];
+  c.langs.forEach(l=>{
+    if(l.isNew){li.push(`Neue Sprache <b>${esc(l.name)}</b> mit ${l.add===1?'1 Wort':l.add+' Wörtern'}`);return;}
+    const t=[],nw=n=>n===1?'1 Wort':n+' Wörter';if(l.add)t.push(l.add===1?'1 neues Wort':`${l.add} neue Wörter`);if(l.upd)t.push(`${nw(l.upd)} geändert`);if(l.del)t.push(`${nw(l.del)} gelöscht`);if(l.learn)t.push(`Lernstand bei ${l.learn===1?'1 Wort':l.learn+' Wörtern'}`);if(l.prog)t.push('Punkte, Päckchen &amp; Statistik');if(l.set)t.push('Punkte &amp; Abfrage');
+    li.push(`<b>${esc(l.name)}</b>: ${t.join(', ')}`);
+  });
+  c.langsDel.forEach(n=>li.push(`Sprache <b>${esc(n)}</b> wird gelöscht`));
+  c.g.forEach(n=>li.push(n));
+  if(c.rewards)li.push(`Spezielle Belohnungen: ${c.rewards} Änderung(en)`);
+  if(c.wins)li.push(`Gewonnene Belohnungen: ${c.wins} Änderung(en)`);
+  if(c.streak)li.push('Serie');
+  return li;
+}
+function pSync(){
+  const p=ui.pendingSync;let bk=null;try{bk=JSON.parse(localStorage.getItem(SYNC_BK)||'null');}catch(e){}
+  return `<div class="secbody">
+  <p class="note" style="margin-top:0">Gleicht Vokabeln, Lernstand, Punkte, Statistik, Sprachen, Belohnungen, Serie und Lernpause mit einem zweiten Handy ab. Bilder, Karten, PIN, Farbschema und Kartenrücken bleiben auf jedem Handy für sich.</p>
+  <button class="btn primary block" data-a="sync-export">Abgleich-Datei senden</button>
+  <label class="btn block" for="syncin" style="margin-top:8px">Abgleich-Datei laden</label><input id="syncin" type="file" accept=".txt,.json,text/plain,application/json,application/octet-stream" hidden data-change="sync-import">
+  ${p?`<div class="busy" style="margin-top:10px">${p.ch.n?`<b>Abgleich mit Datei vom ${fmtDate(p.ts)}:</b><ul style="margin:6px 0 0;padding-left:20px">${syncPreview(p).map(x=>`<li>${x}</li>`).join('')}</ul><p class="note">Vorher wird der aktuelle Stand automatisch gesichert.</p><div class="row" style="margin-top:8px"><button class="btn small primary" data-a="sync-yes">Abgleichen</button><button class="btn small" data-a="sync-no">Abbrechen</button></div>`:`Keine Änderungen: Dieses Handy ist schon auf dem Stand der Datei vom ${fmtDate(p.ts)}.<div class="row" style="margin-top:8px"><button class="btn small" data-a="sync-no">OK</button></div>`}</div>`:''}
+  <p class="note">Ablauf: Auf Handy A „Abgleich-Datei senden“ (z. B. per WhatsApp), auf Handy B die Datei laden und „Abgleichen“. Danach von Handy B eine Datei zurückschicken, damit beide gleich sind.</p>
+  <p class="note">Letzter Abgleich: <b>${S.lastSync?fmtDate(S.lastSync):'noch nie'}</b></p>
+  ${bk?`<div>${confBtn('sync-undo:x','Letzten Abgleich rückgängig machen','block')}</div><p class="note">Stellt den Stand vor dem Abgleich vom ${fmtDate(bk.ts)} wieder her.</p>`:''}
+  </div>`;
 }
 function pBackup(){
   return `<div class="secbody">
@@ -1519,9 +1706,43 @@ async function applyImport(){
     try{await idbClear();}catch(e){}
     Object.keys(IMG).forEach(k=>{URL.revokeObjectURL(IMG[k]);delete IMG[k];delete BLOBS[k];});
     for(const id of Object.keys(d.images||{})){const b=await (await fetch(d.images[id])).blob();await putImg(id,b);}
-    S=migrate(d.state);save();ui.unlocked=true;toast('Sicherung geladen');
+    const dev=S.dev;S=migrate(d.state);S.dev=dev;SIG=syncSig(S);save();ui.unlocked=true;toast('Sicherung geladen');
   }catch(e){toast('Laden fehlgeschlagen');}
   render();
+}
+
+/* ================= Abgleich (Sync-Datei) ================= */
+const SYNC_BK=KEY+'-vor-abgleich';
+async function syncExport(){
+  const now=Date.now(),txt=JSON.stringify(syncPayload(S,now));
+  const name='woerter-sammler-abgleich-'+dateKey(0)+'.txt';
+  try{
+    const f=typeof File==='function'?new File([txt],name,{type:'text/plain'}):null;
+    if(f&&navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Wörter-Sammler Abgleich'});toast('Abgleich-Datei geteilt');return;}
+  }catch(e){if(e&&e.name==='AbortError')return;}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'}));a.download=name;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('Abgleich-Datei gespeichert');
+}
+function readSync(text){
+  let d;try{d=JSON.parse(text);}catch(e){return 'Das ist keine Abgleich-Datei.';}
+  if(!d||d.app!=='woerter-sammler'||!d.state||!Array.isArray(d.state.langs))return 'Das ist keine Abgleich-Datei.';
+  if(d.kind!=='sync')d=syncPayload(migrate(d.state),d.ts||0);
+  if(d.dev&&d.dev===S.dev)return 'Diese Datei kommt von diesem Handy. Bitte die Datei vom anderen Handy laden.';
+  save();
+  const m=syncMerge(S,d.state,Date.now());
+  ui.pendingSync={ts:d.ts||Date.now(),state:m.state,ch:m.ch};return '';
+}
+function openSync(text){const err=readSync(text);if(err){toast(err);return;}ui.view='parent';ui.sec='sync';render();}
+function applySync(){
+  const p=ui.pendingSync;ui.pendingSync=null;if(!p)return;
+  try{localStorage.setItem(SYNC_BK,JSON.stringify({ts:Date.now(),state:S}));}catch(e){toast('Sicherung vor dem Abgleich nicht möglich');render();return;}
+  S=migrate(p.state);S.lastSync=Date.now();SIG=syncSig(S);save();toast('Abgleich fertig');render();
+}
+function undoSync(){
+  let bk=null;try{bk=JSON.parse(localStorage.getItem(SYNC_BK)||'null');}catch(e){}
+  if(!bk||!bk.state)return;
+  S=migrate(bk.state);SIG=syncSig(S);save();try{localStorage.removeItem(SYNC_BK);}catch(e){}
+  toast('Stand vor dem Abgleich wiederhergestellt');render();
 }
 
 /* ================= Ereignisse ================= */
@@ -1756,7 +1977,11 @@ document.addEventListener('click',async e=>{
     case 'toggle-sdef':S.streakCfg.def.active=!S.streakCfg.def.active;save();render();break;
     case 'del-packimg':{if(!ask(d.key))break;await delImg(PACK_KEY);render();toast('Standard-Päckchen wird gezeigt');break;}
     case 'starter':addStarter();break;
-    case 'gift':if(L){L.packs++;save();toast('1 Päckchen geschenkt');}break;
+    case 'gift':if(L){L.packs++;L.gifts.push({id:uid(),ts:Date.now(),n:1});save();toast('1 Päckchen geschenkt');}break;
+    case 'sync-export':syncExport();break;
+    case 'sync-yes':applySync();break;
+    case 'sync-no':ui.pendingSync=null;render();break;
+    case 'sync-undo':{if(!ask(d.key))break;undoSync();break;}
     case 'export':exportBackup();break;
     case 'import-yes':applyImport();break;
     case 'import-no':ui.pendingImport=null;render();break;
@@ -1800,6 +2025,9 @@ document.addEventListener('change',async e=>{
     else if(key==='speechLang')T.speechLang=el.value;
     while(T.points>=T.goal){T.points-=T.goal;T.packs++;}}
     save();render();toast('Gespeichert');
+  }else if(k==='sync-import'){
+    const f=el.files[0];el.value='';if(!f)return;
+    const err=readSync(await f.text());if(err)toast(err);render();
   }else if(k==='import'){
     const f=el.files[0];el.value='';if(!f)return;
     try{
@@ -1842,6 +2070,11 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredIns
   try{const hb=+(localStorage.getItem(POMO_HB)||0);if(S.pomo&&!S.pomo.lock&&S.pomo.idle==null&&hb)S.pomo.idle=hb;}catch(e){}
   try{history.replaceState({v:'home'},'');}catch(e){}
   pomoTick();save();render();setInterval(pomoTick,1000);syncTime();
+  /* über „Teilen“ (z. B. aus WhatsApp) geöffnete Abgleich-Datei, vom Service Worker zwischengespeichert */
+  if(/[?&]shared=1/.test(location.search)){
+    try{history.replaceState({v:'home'},'',location.pathname);}catch(e){}
+    try{const c=await caches.open('share-inbox'),r=await c.match('./shared-file');if(r){const t=await r.text();await c.delete('./shared-file');openSync(t);}}catch(e){toast('Die geteilte Datei konnte nicht gelesen werden.');}
+  }
   if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>

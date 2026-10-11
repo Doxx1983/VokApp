@@ -264,6 +264,29 @@ const test=`
    assert(JSON.parse(JSON.stringify(S)).langs.find(l=>l.id===Lc.id).vocab.find(w=>w.id==='h1').off,'im Backup');
    ui.unit=['HT'];ui.view='home';render();await click({a:'start'});assert.notEqual(ui.view,'quiz','alle pausiert: keine Runde');
    Lc.vocab=Lc.vocab.filter(w=>w.id!=='h1'&&w.id!=='h2');ui.unit=[];ui.unlocked=false;ui.view='home';Q=null;render();}
+ // Abgleich mit anderem Handy (Sync-Datei)
+ {document.body.appendChild=()=>{};const Lc=curLang();ui.view='parent';ui.unlocked=true;ui.pscope='one';ui.sec='sync';render();
+  assert(app().includes('Abgleich-Datei senden')&&app().includes('data-change="sync-import"')&&HELP.sync,'Abschnitt Abgleich + Hilfe');
+  assert(Lc.vocab.some(w=>w.mt>0)&&Lc.smt>0,'Änderungen haben Zeitstempel');
+  await click({a:'sync-export'});
+  const npk=Lc.packs;ui.sec='reward';render();await click({a:'gift'});assert(Lc.packs===npk+1&&Lc.gifts.length===1,'Geschenk vermerkt');ui.sec='sync';render();
+  const now=Date.now(),other=JSON.parse(JSON.stringify(S));other.dev='anderes';const Lo=other.langs.find(l=>l.id===Lc.id);
+  Lo.vocab.push({id:'sy1',f:'window',d:'Fenster',tags:['Zuhause'],box:1,due:0,seen:0,right:0,wrong:0,mt:now+5000});Lo.goal=77;Lo.smt=now+5000;
+  const change=async txt=>{await handlers.change({target:{dataset:{change:'sync-import'},files:[{text:async()=>txt}],value:''}});await tick();};
+  await change(JSON.stringify(syncPayload(other,now)));
+  assert(ui.pendingSync&&app().includes('1 neues Wort')&&app().includes('data-a="sync-yes"'),'Vorschau');
+  assert(!Lc.vocab.some(w=>w.id==='sy1'),'erst nach Bestätigung');
+  const goal0=Lc.goal,pin0=S.pinHash,cards0=Lc.cards.length;
+  await click({a:'sync-yes'});
+  const L2=curLang();assert(L2.vocab.some(w=>w.id==='sy1')&&L2.goal===77&&S.pinHash===pin0&&L2.cards.length===cards0&&S.lastSync,'abgeglichen, PIN und Karten bleiben');
+  assert(localStorage.getItem('woerter-sammler-v1-vor-abgleich'),'automatische Sicherung');assert(app().includes('rückgängig'));
+  await change(JSON.stringify(syncPayload(other,now)));assert(app().includes('Keine Änderungen'),'schon aktuell');await click({a:'sync-no'});
+  await click({a:'sync-undo',key:'sync-undo:x'});await click({a:'sync-undo',key:'sync-undo:x'});
+  assert(!curLang().vocab.some(w=>w.id==='sy1')&&curLang().goal===goal0,'rückgängig gemacht');
+  await change(JSON.stringify(syncPayload(S,now)));assert(!ui.pendingSync,'eigene Datei wird erkannt');
+  await change('kaputt');assert(!ui.pendingSync);
+  await change(JSON.stringify({app:'woerter-sammler',v:1,state:other,images:{}}));assert(ui.pendingSync,'Sicherungsdatei als Quelle');await click({a:'sync-no'});
+  ui.unlocked=false;ui.view='home';render();}
  // Altdaten migrieren
  console.log('SMOKE OK');
 })().catch(e=>{console.error('FEHLER:',e.stack||e);process.exit(1);});

@@ -1,4 +1,4 @@
-const V = 'woerter-sammler-v47';
+const V = 'woerter-sammler-v48';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './fonts/nunito.woff', './fonts/baloo2.woff', ...Array.from({length:10},(_,i)=>'./backs/'+(i+1)+'.svg')];
 
 self.addEventListener('install', e => {
@@ -8,7 +8,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k))))
+      .then(ks => Promise.all(ks.filter(k => k !== V && k !== 'share-inbox').map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -16,6 +16,17 @@ self.addEventListener('activate', e => {
 // Netzwerk zuerst, damit Updates ankommen; ohne Netz kommt die gespeicherte Version.
 self.addEventListener('fetch', e => {
   const req = e.request;
+  // Abgleich-Datei über das Teilen-Menü (Web Share Target): zwischenspeichern und App öffnen
+  if (req.method === 'POST' && new URL(req.url).searchParams.has('share-target')) {
+    e.respondWith((async () => {
+      try {
+        const f = (await req.formData()).get('file');
+        if (f) await (await caches.open('share-inbox')).put('./shared-file', new Response(f));
+      } catch (err) {}
+      return Response.redirect('./index.html?shared=1', 303);
+    })());
+    return;
+  }
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   e.respondWith(
     fetch(req)

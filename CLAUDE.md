@@ -6,8 +6,8 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 ## Arbeitsweise
 - Antworten an Dominic: Deutsch, kurz und präzise.
 - Commit-Trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` und `Claude-Session: <Session-URL>`. Push: `git push -q origin main`.
-- Nach jeder Änderung: `sw.js` Cache-Version `woerter-sammler-vNN` erhöhen (aktuell v47), Tests laufen lassen, committen, pushen. Nutzer muss die App danach einmal neu laden.
-- Tests (Node, ohne Abhängigkeiten): `node tests/logic.test.js`, `tests/stats.test.js`, `tests/pomo.test.js`, `tests/smoke.js` (VM mit DOM-Stubs). `node --check` auf das extrahierte Script. Neue Features immer im Smoke-Test abdecken.
+- Nach jeder Änderung: `sw.js` Cache-Version `woerter-sammler-vNN` erhöhen (aktuell v48), Tests laufen lassen, committen, pushen. Nutzer muss die App danach einmal neu laden.
+- Tests (Node, ohne Abhängigkeiten): `node tests/logic.test.js`, `tests/stats.test.js`, `tests/pomo.test.js`, `tests/sync.test.js`, `tests/smoke.js` (VM mit DOM-Stubs). `node --check` auf das extrahierte Script. Neue Features immer im Smoke-Test abdecken.
 - `pkill -f` nicht verwenden (beendet die eigene Shell).
 
 ## Architektur
@@ -27,12 +27,13 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 - Statistik: Kennzahlen, Woche (Mo–So)/Monat, Verlauf Punkte/Lernzeit (Tage/Wochen), Wissensstand, knifflige Wörter.
 - Vokabelliste mit Kategorie-Filter, Sortierung und Spalte „Stand“ (5 Balken, grün ab Box 4).
 - „Zu schwer“: Knopf in der Abfrage (Frage- und Feedback-Phase, mit Rückfrage „Wirklich zu schwer?“ Ja/Nein; Zeit der Rückfrage wird über `hardCancel` aus der Antwortzeit herausgerechnet) setzt `w.hard`/`w.hardTs`, Wort fällt aus der Runde (keine Punkte, Lernstand unverändert). Elternbereich-Abschnitt „Zu schwere Wörter“ (`pHard`): ✎ bearbeiten, Aktiv/Pausiert (`w.off`, von `pickSession` ausgeschlossen, in Vokabelliste als „pausiert“), „Erledigt“ entfernt die Meldung. Pausieren auch per Häkchen im Wort-Modal.
+- Abgleich zwischen zwei Handys (Elternbereich „Abgleich mit anderem Handy“, `pSync`): Sync-Datei `.txt` (JSON, `kind:'sync'`) per Teilen-Menü (Web Share, sonst Download) oder Web Share Target (`manifest` → `sw.js` legt die Datei in Cache `share-inbox`, App öffnet `?shared=1`). Laden zeigt Vorschau (`ui.pendingSync`), „Abgleichen“ legt vorher `woerter-sammler-v1-vor-abgleich` an (rückgängig machbar). Abgeglichen: Sprachen, Vokabeln, Lernstand, Punkte/Päckchen, Log, Serie, Belohnungen, wins, `streakCfg`, `pomoCfg`, Punkte & Abfrage. Geräteeigen: PIN, `pomo`-Sperre, Theme, Modus, Kartenrücken, Karten/Album (`cards`, `owned`, `back`), Bilder, `S.dev`.
+- Sync-Logik in der LOGIC (`syncSig`, `syncStamp`, `syncPayload`, `syncMerge`, Tests in `tests/sync.test.js`): `save()` vergleicht mit `SIG` und stempelt automatisch (Wort `mt` Inhalt / `ht` Zu schwer / `lt` Lernstand; Sprache `smt` Einstellungen / `pmt` Punkte; `S.mt[streakCfg|pomoCfg]`; Belohnung `r.mt`; Löschungen in `S.del` nach Id und Wortpaar-/Sprachschlüssel). Zusammenführen: neuerer Zeitstempel je Gruppe, Lernstand bei Gleichstand größeres `seen`, Log je Tag Maximum, wins vereinigt, Geschenke als Liste `L.gifts` (zählen nicht als Lernstand-Änderung). Gleich benannte Sprachen/gleiche Wortpaare werden zusammengelegt und merken die fremde Id in `aka`. Nach Merge/Restore `SIG=syncSig(S)` setzen, damit nichts neu gestempelt wird.
 - Pomodoro-Lernpause: Lernzeit/Pause/Leerlauf einstellbar, Sperre „Mach mal Pause!“ mit Serverzeit (läuft bei geschlossener App weiter), Entsperren nur mit Eltern-PIN; PIN beim ersten Start verpflichtend.
 - Eltern: Sprachen, Vokabeln (Import `Fremdwort = Deutsch`, Überschriften `# Kategorie` für mehrere Kategorien), Karten (Import, Markieren/gesammelt löschen, Doppelte zusammenführen, fehlende Bilder wiederherstellen), Spezielle Belohnungen, Serien-Belohnung, Lernpause, Punkte & Abfrage, Sicherung & PIN (Erinnerung nach 14 Tagen ohne Sicherung).
 
 ## Offen / Entscheidungen
 - E-Mail/Push bei abgeschlossener Serie: nicht gebaut (bräuchte externen Dienst, z. B. ntfy.sh).
-- Sync zwischen zwei Handys: nicht gebaut (bräuchte Cloud-Backend), „aktuell nicht“.
 - Karten-Pack-Bild (urheberrechtlich) ist nicht im Repo; wird vom Nutzer hochgeladen.
 
 ## Vokabel-Tags (statt fester Kategorien)
