@@ -741,7 +741,7 @@ const HELP={
     'Kleine Tippfehler werden erkannt und als richtig gewertet.',
     'Falsche Wörter kommen in der Runde noch einmal vor.',
     'Richtige Antworten bringen Punkte für das nächste Päckchen.',
-    'Zu schwer: Ist ein Wort viel zu schwer, tippe auf „Zu schwer“. Es fällt aus der Runde und Mama oder Papa schauen es sich an. Das kostet keine Punkte.']],
+    'Zu schwer: Ist ein Wort viel zu schwer, tippe auf „Zu schwer“ und dann auf „Ja, melden“. Es fällt aus der Runde und Mama oder Papa schauen es sich an. Das kostet keine Punkte.']],
   list:['Vokabeln',[
     'Hier siehst du alle Wörter der gewählten Sprache.',
     'Kategorien: Mit dem Auswahlfeld filterst du die Liste. Du kannst mehrere Kategorien wählen, es erscheinen alle Wörter, die in mindestens einer davon stehen.',
@@ -1005,7 +1005,7 @@ function vQuiz(){
     <button id="nextbtn" class="btn primary block" style="min-height:60px;font-size:19px" data-a="next">${Q.queue.length?'Weiter':'Fertig'}</button>`;
   }
   return `<div class="qtop"><button class="icon-btn" data-a="quit" aria-label="Beenden">✕</button><div class="bar grow"><i style="width:${pct}%"></i></div><span class="pill">+${Q.earned}</span></div>
-  <div class="qcard"><div class="qlabel">${qLabel(L,it.dir,speak)}</div><div class="qword">${esc(q)}</div>${Q.phase==='ask'&&Q.hint>0?`<div class="qhint">${esc(hintText(ans,Q.hint))}</div>`:''}</div>${body}${Q.phase==='ask'||Q.phase==='fb'?`<div class="center" style="margin-top:14px">${Q.marked===it.id?'<span class="pill">Gemeldet ✓</span>':'<button class="btn small" data-a="too-hard">Zu schwer</button>'}</div>`:''}`;
+  <div class="qcard"><div class="qlabel">${qLabel(L,it.dir,speak)}</div><div class="qword">${esc(q)}</div>${Q.phase==='ask'&&Q.hint>0?`<div class="qhint">${esc(hintText(ans,Q.hint))}</div>`:''}</div>${body}${Q.phase==='ask'||Q.phase==='fb'?`<div class="center" style="margin-top:14px">${Q.marked===it.id?'<span class="pill">Gemeldet ✓</span>':Q.hardAsk?'<div style="font-weight:800;margin-bottom:8px">Wirklich zu schwer?</div><div class="row"><button class="btn small primary grow" data-a="too-hard-yes">Ja, melden</button><button class="btn small grow" data-a="too-hard-no">Nein</button></div>':'<button class="btn small" data-a="too-hard">Zu schwer</button>'}</div>`:''}`;
 }
 
 function vSummary(){
@@ -1403,6 +1403,7 @@ function startQuiz(){
   ui.view='quiz';render();
 }
 function resolveAnswer(kind,heard){
+  hardCancel();
   const L=curLang(),it=Q.queue.shift();Q.last=it;
   const w=L.vocab.find(x=>x.id===it.id);
   let pts=0;const hinted=Q.hint>0,retry=!it.first,first=it.first;
@@ -1423,6 +1424,8 @@ function resolveAnswer(kind,heard){
   Q.fb={kind,pts,hinted,retry,dropped,heard:heard||''};Q.phase='fb';Q.speechMsg='';render();
 }
 /* Kind meldet ein Wort als zu schwer: kommt auf die Elternliste, fällt aus dieser Runde, ohne Punkte oder Lernstand zu ändern. */
+/* Zeit für die Rückfrage zählt nicht zur Antwortzeit. */
+function hardCancel(){if(Q&&Q.hardAsk){if(Q.t0)Q.t0+=Date.now()-Q.hardAsk;Q.hardAsk=0;}}
 function markHard(){
   const L=curLang(),it=Q.phase==='fb'?Q.last:Q.queue[0];if(!it)return;
   const w=L.vocab.find(x=>x.id===it.id);if(!w)return;
@@ -1620,7 +1623,9 @@ document.addEventListener('click',async e=>{
       if(Q.hint<letters-1)Q.hint++;
       const v=val('#ans');render();const a=$('#ans');if(a){a.value=v;a.focus();}break;}
     case 'next':nextQuestion();break;
-    case 'too-hard':markHard();break;
+    case 'too-hard':if(Q){Q.hardAsk=Date.now();render();}break;
+    case 'too-hard-yes':if(Q){hardCancel();markHard();}break;
+    case 'too-hard-no':if(Q){hardCancel();render();}break;
     case 'open-pack':openPack();break;
     case 'tear':{if(navigator.vibrate)navigator.vibrate(30);const go=()=>{ui.pack.opened=true;render();};if(window.matchMedia&&!matchMedia('(prefers-reduced-motion:reduce)').matches){el.classList.add('tearing');setTimeout(go,420);}else go();break;}
     case 'flip':{

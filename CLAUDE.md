@@ -6,7 +6,7 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 ## Arbeitsweise
 - Antworten an Dominic: Deutsch, kurz und präzise.
 - Commit-Trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` und `Claude-Session: <Session-URL>`. Push: `git push -q origin main`.
-- Nach jeder Änderung: `sw.js` Cache-Version `woerter-sammler-vNN` erhöhen (aktuell v46), Tests laufen lassen, committen, pushen. Nutzer muss die App danach einmal neu laden.
+- Nach jeder Änderung: `sw.js` Cache-Version `woerter-sammler-vNN` erhöhen (aktuell v47), Tests laufen lassen, committen, pushen. Nutzer muss die App danach einmal neu laden.
 - Tests (Node, ohne Abhängigkeiten): `node tests/logic.test.js`, `tests/stats.test.js`, `tests/pomo.test.js`, `tests/smoke.js` (VM mit DOM-Stubs). `node --check` auf das extrahierte Script. Neue Features immer im Smoke-Test abdecken.
 - `pkill -f` nicht verwenden (beendet die eigene Shell).
 
@@ -26,7 +26,7 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 - Optionen: 18 Farbschemata (alphabetisch, dunkel + „hell“-Varianten), Kartenrücken.
 - Statistik: Kennzahlen, Woche (Mo–So)/Monat, Verlauf Punkte/Lernzeit (Tage/Wochen), Wissensstand, knifflige Wörter.
 - Vokabelliste mit Kategorie-Filter, Sortierung und Spalte „Stand“ (5 Balken, grün ab Box 4).
-- „Zu schwer“: Knopf in der Abfrage (Frage- und Feedback-Phase) setzt `w.hard`/`w.hardTs`, Wort fällt aus der Runde (keine Punkte, Lernstand unverändert). Elternbereich-Abschnitt „Zu schwere Wörter“ (`pHard`): ✎ bearbeiten, Aktiv/Pausiert (`w.off`, von `pickSession` ausgeschlossen, in Vokabelliste als „pausiert“), „Erledigt“ entfernt die Meldung. Pausieren auch per Häkchen im Wort-Modal.
+- „Zu schwer“: Knopf in der Abfrage (Frage- und Feedback-Phase, mit Rückfrage „Wirklich zu schwer?“ Ja/Nein; Zeit der Rückfrage wird über `hardCancel` aus der Antwortzeit herausgerechnet) setzt `w.hard`/`w.hardTs`, Wort fällt aus der Runde (keine Punkte, Lernstand unverändert). Elternbereich-Abschnitt „Zu schwere Wörter“ (`pHard`): ✎ bearbeiten, Aktiv/Pausiert (`w.off`, von `pickSession` ausgeschlossen, in Vokabelliste als „pausiert“), „Erledigt“ entfernt die Meldung. Pausieren auch per Häkchen im Wort-Modal.
 - Pomodoro-Lernpause: Lernzeit/Pause/Leerlauf einstellbar, Sperre „Mach mal Pause!“ mit Serverzeit (läuft bei geschlossener App weiter), Entsperren nur mit Eltern-PIN; PIN beim ersten Start verpflichtend.
 - Eltern: Sprachen, Vokabeln (Import `Fremdwort = Deutsch`, Überschriften `# Kategorie` für mehrere Kategorien), Karten (Import, Markieren/gesammelt löschen, Doppelte zusammenführen, fehlende Bilder wiederherstellen), Spezielle Belohnungen, Serien-Belohnung, Lernpause, Punkte & Abfrage, Sicherung & PIN (Erinnerung nach 14 Tagen ohne Sicherung).
 

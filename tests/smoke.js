@@ -244,11 +244,14 @@ const test=`
   {const Lc=curLang();Lc.vocab.push({id:'h1',f:'hh1',d:'g1',tags:['HT'],box:1,due:0,seen:0,right:0,wrong:0},{id:'h2',f:'hh2',d:'g2',tags:['HT'],box:1,due:0,seen:0,right:0,wrong:0});
    ui.unit=['HT'];S.pomo=null;Lc.sessionSize=10;ui.view='home';render();await click({a:'start'});assert.equal(ui.view,'quiz');assert.equal(Q.total,2);
    assert(app().includes('data-a="too-hard"'),'Knopf Zu schwer');
-   const id0=Q.queue[0].id,pts0=Lc.points,e0=Q.earned;await click({a:'too-hard'});
+   const id0=Q.queue[0].id,pts0=Lc.points,e0=Q.earned;
+   const t0=Q.t0;await click({a:'too-hard'});assert(app().includes('Wirklich zu schwer?')&&!Lc.vocab.find(w=>w.id===id0).hard,'erst bestätigen');
+   Q.hardAsk-=5000;await click({a:'too-hard-no'});assert(!Q.hardAsk&&Q.t0>=t0+5000&&Q.queue[0].id===id0,'Nein: Zeit nicht gezählt, Wort bleibt');
+   await click({a:'too-hard'});await click({a:'too-hard-yes'});
    const w0=Lc.vocab.find(w=>w.id===id0);assert(w0.hard&&w0.hardTs,'markiert');assert.equal(w0.seen,0,'Lernstand unverändert');assert.equal(Lc.points,pts0);assert.equal(Q.earned,e0);
    assert(!Q.queue.some(x=>x.id===id0)&&Q.total===1&&Q.phase==='ask','aus der Runde');
    const id1=Q.queue[0].id,w1=Lc.vocab.find(w=>w.id===id1);stub('#ans').value='falsch123';await click({a:'check'});assert.equal(Q.phase,'fb');
-   await click({a:'too-hard'});assert(w1.hard&&Q.marked===id1&&!Q.queue.length,'nach Antwort melden');assert(app().includes('Gemeldet ✓'));
+   await click({a:'too-hard'});await click({a:'too-hard-yes'});assert(w1.hard&&Q.marked===id1&&!Q.queue.length,'nach Antwort melden');assert(app().includes('Gemeldet ✓'));
    await click({a:'next'});assert.equal(ui.view,'summary');
    ui.view='parent';ui.unlocked=true;ui.pscope='one';ui.sec='hard';render();
    assert(app().includes('Zu schwere Wörter')&&app().includes('2 neu')&&app().includes('hh1')&&app().includes('data-a="toggle-off"'),'Elternliste');
