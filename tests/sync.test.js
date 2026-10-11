@@ -160,7 +160,8 @@ const conv=A.syncPayload(A.migrate(full.state),0);assert(!JSON.stringify(conv).i
  const rw=[{id:'r1',text:'Eis',rarity:'s',active:true,once:true,mt:{}}];
  assert(A.tradeApply(L,{...cfg,kind:'text',rid:'rx'},'e',rw,5,()=>'w').err,'fehlende Belohnung');assert.equal(L.owned.k3,2,'nichts abgezogen');
  r=A.tradeApply(L,{...cfg,need:{...cfg.need,e:1},kind:'text',rid:'r1'},'e',rw,7,()=>'win1');assert(!r.err);assert.equal(L.wins.at(-1).text,'Eis');assert.equal(L.wins.at(-1).src,'trade');assert.equal(L.owned.k3,1);assert(!rw[0].active,'einmalig');
- assert.equal(A.tradePrize({kind:'text',rid:'r1'},rw),null,'pausierte Belohnung nicht tauschbar');
+ assert.equal(A.tradePrize({kind:'text',rid:'r1'},rw).text,'Eis','pausierte Belohnung bleibt tauschbar');
+ L.owned.k3=2;r=A.tradeApply(L,{...cfg,need:{...cfg.need,e:1},kind:'text',rid:'r1'},'e',rw,8,()=>'win2');assert(!r.err&&L.wins.at(-1).id==='win2','pausiert: trotzdem vergeben');
  assert.equal(A.tradePrize({kind:'pack',packs:3},[]).label,'3× Päckchen');assert.equal(A.tradePrize({kind:'mega',packs:1},[]).label,'Mega-Pack');}
 // Tausch und Abgleich: Einstellung mit Zeitstempel, nichts wird verdoppelt
 {const kid=device(base('t1',['a','b','c'])),par=device(clone(kid.S));

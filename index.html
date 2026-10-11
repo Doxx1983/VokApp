@@ -830,7 +830,7 @@ function tradePick(L,rk,need){
 /* Gegenwert beschreiben; null, wenn die Spezielle Belohnung fehlt */
 function tradePrize(cfg,rewards){
   const t=tradeNorm(cfg);
-  if(t.kind==='text'){const r=(rewards||[]).find(x=>x.id===t.rid);return r&&r.active?{kind:'text',rid:r.id,text:r.text}:null;}
+  if(t.kind==='text'){const r=(rewards||[]).find(x=>x.id===t.rid);return r?{kind:'text',rid:r.id,text:r.text}:null;}
   const sp=SPECIAL_PACKS[t.kind];return {kind:'pack',t:sp?t.kind:'',n:t.packs,label:(t.packs>1?t.packs+'× ':'')+(sp?sp.name:(t.packs>1?'Päckchen':'1 Päckchen'))};
 }
 /* führt einen Tausch aus (ändert L und ggf. rewards); gibt {gave,prize} oder {err} zurück */
@@ -1080,7 +1080,8 @@ const HELP={
     'Ausgewählt wird der Rücken in den Optionen, getrennt für jede Sprache. Eigene Rücken sind in der Sicherung enthalten.']],
   prizes:['Spezielle Belohnungen',[
     'Lege eigene Belohnungen als Text an, z. B. „Eis essen“.',
-    'Sie können als Preise für Päckchen oder Serien verwendet werden.',
+    'Sie können als Preise für Päckchen, Serien oder den Karten-Tausch verwendet werden.',
+    'Aktiv / Aus: Eine ausgeschaltete (pausierte) Belohnung kommt nicht mehr in Päckchen vor. Ist sie als Serien- oder Tausch-Belohnung eingestellt, wird sie dort trotzdem vergeben. „Nur einmal gewinnbar“ schaltet sie nach dem Gewinn aus.',
     'Im Album erscheinen sie als besondere Karten.']],
   streak:['Serien-Belohnung',[
     'Länge einer Serie: Nach so vielen Tagen in Folge gibt es die Belohnung.',
@@ -1531,7 +1532,7 @@ function pTrade(){
   <h3 style="margin-top:14px">Gegenwert</h3>
   <div class="field"><label for="tc-kind">Belohnung</label><select id="tc-kind" class="in" data-change="tcfg" data-k="kind">${opt('pack','Päckchen')}${Object.keys(SPECIAL_PACKS).map(k=>opt(k,`${SPECIAL_PACKS[k].name} (${SPECIAL_PACKS[k].desc})`)).join('')}${opt('text','Spezielle Belohnung')}</select></div>
   ${t.kind!=='text'?`<div class="field"><label for="tc-packs">Anzahl</label><input id="tc-packs" class="in" type="number" inputmode="numeric" min="1" max="10" value="${t.packs}" data-change="tcfg" data-k="packs"></div>`
-   :`<div class="field"><label for="tc-rid">Spezielle Belohnung</label><select id="tc-rid" class="in" data-change="tcfg" data-k="rid">${rewardOpts(t.rid)}</select></div>${pz?'':`<p class="muted">${S.rewards.length?'Wähle eine aktive Belohnung aus.':'Lege erst unter „Spezielle Belohnungen“ eine an.'}</p>`}`}
+   :`<div class="field"><label for="tc-rid">Spezielle Belohnung</label><select id="tc-rid" class="in" data-change="tcfg" data-k="rid">${rewardOpts(t.rid)}</select></div>${pz?'':`<p class="muted">${S.rewards.length?'Wähle eine Belohnung aus.':'Lege erst unter „Spezielle Belohnungen“ eine an.'}</p>`}`}
   </div>`;
 }
 function pReward(L){

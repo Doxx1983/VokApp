@@ -136,6 +136,8 @@ const test=`
  S.streakCfg.def.kind='text';S.streakCfg.def.rid='rw2';sr=await sim(2);assert.equal(sr.w,1,'Standard: spezielle');assert.equal(curLang().wins.at(-1).text,'Kino');
  await chg('next','rw1');sr=await sim(4);assert.equal(curLang().wins.at(-1).text,'Eis essen','nächste Serie: spezielle');assert.equal(S.streakCfg.nextRid,'','nächste verbraucht');assert(!S.rewards.find(x=>x.id==='rw1').active,'once deaktiviert');
  sr=await sim(4);assert.equal(curLang().wins.at(-1).text,'Kino','danach wieder Standard');
+ S.rewards.find(x=>x.id==='rw2').active=false;sr=await sim(2);assert.equal(sr.w,1,'pausiert: Standard trotzdem vergeben');S.rewards.find(x=>x.id==='rw2').active=true;
+ await chg('next','rw1');assert(!S.rewards.find(x=>x.id==='rw1').active);sr=await sim(4);assert.equal(curLang().wins.at(-1).text,'Eis essen','pausiert: nächste Serie trotzdem vergeben');assert.equal(S.streakCfg.nextRid,'','danach automatisch entfernt');
  S.streakCfg.def.active=false;sr=await sim(6);assert.equal(sr.p+sr.w,0,'Standard aus');
  await click({a:'nav',v:'home'});
  // Statistik
@@ -250,7 +252,7 @@ const test=`
    await click({a:'trade-ask',r:'n'});await click({a:'trade-go',r:'n'});assert(!ui.modal);assert.deepEqual(Lc.owned,{tk1:1,tk2:1,tk3:2},'erste Karte bleibt');assert.deepEqual(Lc.sp,['big','big']);assert.equal(Lc.packs,p0);
    assert(app().includes('0 doppelt · 4 für einen Tausch')&&app().includes('Päckchen öffnen'));
    await click({a:'trade-ask',r:'n'});assert(!ui.modal,'ohne Doppelte kein Tausch');
-   S.rewards.push({id:'trw',text:'Pizza backen',rarity:'s',lang:'all',active:true,once:false,mt:{}});await tc('kind','text');await tc('rid','trw');
+   S.rewards.push({id:'trw',text:'Pizza backen',rarity:'s',lang:'all',active:false,once:false,mt:{}});await tc('kind','text');await tc('rid','trw');
    await click({a:'nav',v:'album'});await click({a:'trade-ask',r:'e'});await click({a:'trade-go',r:'e'});assert.equal(Lc.owned.tk3,1);
    const w=Lc.wins.at(-1);assert(w.text==='Pizza backen'&&w.src==='trade'&&!w.redeemed);assert(app().includes('Pizza backen')&&app().includes('Tausch'),'in Meine Belohnungen');
    ui.view='parent';ui.unlocked=true;ui.sec='prizes';render();assert(app().includes('Gewonnen, noch nicht eingelöst')&&app().includes('data-a="redeem" data-id="'+w.id+'"'),'Eltern sehen die Prämie');
