@@ -239,7 +239,7 @@ const test=`
    ui.view='parent';ui.unlocked=true;ui.pscope='one';ui.sec='';await click({a:'ppage',p:'rewards'});assert(app().includes('id="sec-trade"')&&app().includes('Tauschen erlaubt'));
    await click({a:'toggle-trade'});assert(S.tradeCfg.active);
    const tc=async(k,v,r)=>{await handlers.change({target:{dataset:{change:'tcfg',k,r},value:v}});await tick();};
-   await tc('need','4','n');assert.equal(S.tradeCfg.need.n,4);await tc('need','0','e');assert.equal(S.tradeCfg.need.e,1,'mindestens 1');
+   await tc('need','150','n');assert.equal(S.tradeCfg.need.n,150,'dreistellig');await tc('need','4','n');assert.equal(S.tradeCfg.need.n,4);await tc('need','0','e');assert.equal(S.tradeCfg.need.e,1,'mindestens 1');
    await tc('kind','big');assert.equal(S.tradeCfg.kind,'big');await tc('packs','2');assert.equal(S.tradeCfg.packs,2);
    assert(app().includes('tc-packs'));await tc('kind','text');assert(app().includes('tc-rid')&&!app().includes('tc-packs'));
    ui.unlocked=false;await click({a:'nav',v:'album'});assert(app().includes('Mama oder Papa müssen im Elternbereich noch eine Belohnung'),'ohne Belohnung kein Tausch');

@@ -145,7 +145,7 @@ const full={app:'woerter-sammler',v:1,state:clone(par.S),images:{x:'data:image/p
 const conv=A.syncPayload(A.migrate(full.state),0);assert(!JSON.stringify(conv).includes('data:image'));
 // Doppelte Karten eintauschen
 {const t=A.tradeNorm(undefined);assert.deepEqual(t,{active:false,need:{n:3,s:3,e:3,l:3},kind:'pack',packs:1,rid:''},'Standard');
- assert.equal(A.tradeNorm({need:{n:0,e:99},kind:'x',packs:50}).need.n,3);assert.equal(A.tradeNorm({need:{e:99}}).need.e,20);assert.equal(A.tradeNorm({kind:'x'}).kind,'pack');
+ assert.equal(A.tradeNorm({need:{n:0,e:99},kind:'x',packs:50}).need.n,3);assert.equal(A.tradeNorm({need:{e:500}}).need.e,500);assert.equal(A.tradeNorm({need:{e:5000}}).need.e,999);assert.equal(A.tradeNorm({kind:'x'}).kind,'pack');
  const mk=()=>{const L=A.migrate(base('t1',['a','b','c'])).langs[0];
    L.cards=[{id:'k1',name:'Hund',rarity:'n'},{id:'k2',name:'Katze',rarity:'n'},{id:'k3',name:'Drache',rarity:'e'},{id:'k4',name:'Fuchs',rarity:'n'}];
    L.owned={k1:3,k2:2,k3:4,k4:1};return L;};

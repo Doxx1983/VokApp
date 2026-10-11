@@ -813,7 +813,7 @@ function syncMerge(loc,rem,now){
    Karten/Album sind geräteeigen, daher verdoppelt der Abgleich keine Karten; das Päckchen zählt als Fortschritt (pmt), die Text-Belohnung als win mit eigener Id. */
 function tradeNorm(t){
   t=t&&typeof t==='object'?t:{};const n=t.need&&typeof t.need==='object'?t.need:{};
-  return {active:!!t.active,need:Object.fromEntries(RARITIES.map(r=>[r.k,Math.max(1,Math.min(20,Math.round(+n[r.k])||3))])),
+  return {active:!!t.active,need:Object.fromEntries(RARITIES.map(r=>[r.k,Math.max(1,Math.min(999,Math.round(+n[r.k])||3))])),
     kind:(t.kind==='text'||SPECIAL_PACKS[t.kind])?t.kind:'pack',packs:Math.max(1,Math.min(10,Math.round(+t.packs)||1)),rid:typeof t.rid==='string'?t.rid:''};
 }
 const tradeNeed=(cfg,rk)=>tradeNorm(cfg).need[rk]||3;
@@ -1527,7 +1527,7 @@ function pTrade(){
   <p class="note">Das Kind tauscht im Album doppelte Karten gegen eine Belohnung. Die erste Karte jeder Sorte bleibt immer im Album, abgegeben werden nur Doppelte derselben Seltenheit.</p>
   <div class="urow"><div class="t"><b>Tauschen erlaubt</b></div><button class="tog ${t.active?'on':''}" data-a="toggle-trade">${t.active?'Aktiv':'Aus'}</button></div>
   <h3 style="margin-top:14px">Doppelte Karten für einen Tausch</h3>
-  ${RARITIES.map(r=>`<div class="field"><label for="tc-${r.k}">${r.label}</label><input id="tc-${r.k}" class="in" type="number" inputmode="numeric" min="1" max="20" value="${t.need[r.k]}" data-change="tcfg" data-k="need" data-r="${r.k}"></div>`).join('')}
+  ${RARITIES.map(r=>`<div class="field"><label for="tc-${r.k}">${r.label}</label><input id="tc-${r.k}" class="in" type="number" inputmode="numeric" min="1" max="999" value="${t.need[r.k]}" data-change="tcfg" data-k="need" data-r="${r.k}"></div>`).join('')}
   <h3 style="margin-top:14px">Gegenwert</h3>
   <div class="field"><label for="tc-kind">Belohnung</label><select id="tc-kind" class="in" data-change="tcfg" data-k="kind">${opt('pack','Päckchen')}${Object.keys(SPECIAL_PACKS).map(k=>opt(k,`${SPECIAL_PACKS[k].name} (${SPECIAL_PACKS[k].desc})`)).join('')}${opt('text','Spezielle Belohnung')}</select></div>
   ${t.kind!=='text'?`<div class="field"><label for="tc-packs">Anzahl</label><input id="tc-packs" class="in" type="number" inputmode="numeric" min="1" max="10" value="${t.packs}" data-change="tcfg" data-k="packs"></div>`
@@ -2259,7 +2259,7 @@ document.addEventListener('change',async e=>{
   else if(k==='pomo'){const key=el.dataset.k,lim={work:[1,90],brk:[1,30],idle:[1,30]}[key];if(lim){S.pomoCfg[key]=clamp(el.value,lim[0],lim[1]);save();render();}}
   else if(k==='tcfg'){
     const t=S.tradeCfg,key=el.dataset.k;
-    if(key==='need'&&t.need[el.dataset.r]!=null)t.need[el.dataset.r]=clamp(el.value,1,20);
+    if(key==='need'&&t.need[el.dataset.r]!=null)t.need[el.dataset.r]=clamp(el.value,1,999);
     else if(key==='kind')t.kind=(el.value==='text'||SPECIAL_PACKS[el.value])?el.value:'pack';
     else if(key==='packs')t.packs=clamp(el.value,1,10);
     else if(key==='rid')t.rid=el.value;
