@@ -63,7 +63,7 @@ button:focus-visible,.in:focus-visible,.chip:focus-visible{outline:3px solid var
 .seg3{grid-template-columns:1fr 1fr 1fr}
 .ptabs{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:10px 0 6px;border-bottom:2px solid var(--line)}
 .ptabs button{appearance:none;border:0;background:none;color:var(--muted);font:inherit;font-weight:800;font-size:12.5px;padding:6px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;min-height:56px}
-.ptabs button .pi{font-size:22px;line-height:1}
+.ptabs button .pi{font-size:22px;line-height:1}.ptabs button{text-align:center;line-height:1.15}
 .ptabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
 .psec{background:var(--surface);border-radius:16px;box-shadow:var(--shadow);margin-top:14px;padding:14px 16px 4px;scroll-margin-top:12px}.psec>h3{margin:0 0 6px;font-size:19px}
 .psec .secbody{background:none;box-shadow:none;padding:0 0 12px;margin:0;border-radius:0}
@@ -1007,10 +1007,10 @@ const HELP={
     'Der Bereich ist mit einer PIN geschützt. „Sperren“ schließt ihn wieder.',
     'Kind wechseln: Tippe oben auf den Namen neben „Elternbereich“ und wähle das Kind. Dort kannst du auch ein weiteres Kind anlegen.',
     'Alle Sprachen / Einzelne Sprache: Bei „Alle Sprachen“ gelten Punkte & Abfrage für jede Sprache. Bei „Einzelne Sprache“ wählst du im Dropdown die Sprache und kannst deren Vokabeln, Karten und Belohnungen bearbeiten.',
-    'Seiten: Oben wechselst du zwischen Wörter (Sprachen, Vokabeln, zu schwere Wörter), Karten (Karten, Kartenrücken), Belohnungen (Spezielle Belohnungen, Serie, Punkte & Abfrage, Lernpause) und Einstellungen (Kinder, Abgleich, Sicherung & PIN).',
+    'Seiten: Oben wechselst du zwischen Sprachen (Sprachen, Vokabeln, zu schwere Wörter), Karten (Karten, Kartenrücken), Lernen & Belohnungen (Punkte & Abfrage, Serie, Spezielle Belohnungen, Lernpause) und Administration (Kinder, Abgleich, Sicherung & PIN).',
     'Hilfe: „? Hilfe“ erklärt alles auf der aktuellen Seite.',
     'Zwei Handys: Unter „Abgleich mit anderem Handy“ gleichst du Vokabeln, Lernstand und Einstellungen per Datei ab.',
-    'Einmal im Monat sollte unter Einstellungen → „Sicherung & PIN“ eine Sicherung gespeichert werden.']],
+    'Einmal im Monat sollte unter Administration → „Sicherung & PIN“ eine Sicherung gespeichert werden.']],
   lang:['Sprachen',[
     'Lege hier Sprachen an, z. B. „Französisch“.',
     'Jede Sprache hat eigene Vokabeln, Punkte, Karten und Statistik.',
@@ -1322,13 +1322,13 @@ function vAlbum(){
 function pBacks(L){
   return `<p class="note" style="margin:0 0 8px">Hier fügst du eigene Kartenrücken hinzu. Ausgewählt wird der Rücken in den Optionen, getrennt für jede Sprache.</p>
   <label class="btn small block" for="backin">Eigenen Kartenrücken hinzufügen</label><input id="backin" type="file" accept="image/*" hidden data-change="backimg">
-  ${S.customBacks.length?`<div class="grid" style="margin-top:12px">${S.customBacks.map(b=>`<div style="text-align:center"><img src="${backSrc(b.id)}" alt="" style="width:100%;aspect-ratio:360/504;object-fit:cover;border-radius:12px;display:block"><div class="note" style="margin:4px 0">${esc(b.name)}</div>${confBtn('del-back:'+b.id,'Löschen','block')}</div>`).join('')}</div>`:'<p class="note">Noch keine eigenen Kartenrücken.</p>'}`;
+  ${S.customBacks.length?`<button class="subhead" data-a="toggle-backlist" aria-expanded="${!!ui.backsOpen}"><span>Eigene Kartenrücken (${S.customBacks.length})</span><span>${ui.backsOpen?'−':'+'}</span></button>${ui.backsOpen?`<div class="grid" style="margin-top:12px">${S.customBacks.map(b=>`<div style="text-align:center"><img src="${backSrc(b.id)}" alt="" style="width:100%;aspect-ratio:360/504;object-fit:cover;border-radius:12px;display:block"><div class="note" style="margin:4px 0">${esc(b.name)}</div>${confBtn('del-back:'+b.id,'Löschen','block')}</div>`).join('')}</div>`:''}`:'<p class="note">Noch keine eigenen Kartenrücken.</p>'}`;
 }
 function confBtn(key,label,cls,attrs){const on=ui.confirm===key;return `<button class="btn small ${on?'danger':cls||''}" ${attrs||''} data-a="${key.split(':')[0]}" data-key="${esc(key)}">${on?'Wirklich?':label}</button>`;}
 const rarOptions=sel=>RARITIES.map(r=>`<option value="${r.k}" ${sel===r.k?'selected':''}>${r.label}</option>`).join('');
 
 /* Elternbereich: vier Seiten mit festen Abschnitten (statt aufklappbarer Abschnitte) */
-const PPAGES=[['words','Wörter',['lang','vocab','hard'],'📚'],['cards','Karten',['cards','backs'],'🃏'],['rewards','Belohnungen',['prizes','streak','reward','pomo'],'🎁'],['settings','Einstellungen',['kids','sync','backup'],'⚙️']];
+const PPAGES=[['words','Sprachen',['lang','vocab','hard'],'📚'],['cards','Karten',['cards','backs'],'🃏'],['rewards','Lernen & Belohnungen',['reward','streak','prizes','pomo'],'🎁'],['settings','Administration',['kids','sync','backup'],'⚙️']];
 const pageOf=k=>{const p=PPAGES.find(x=>x[2].includes(k));return p?p[0]:'';};
 function vParent(){
   if(!ui.unlocked){
@@ -1347,7 +1347,7 @@ function vParent(){
   const pg=PPAGES.some(x=>x[0]===ui.ppage)?ui.ppage:'words';ui.ppage=pg;
   let h=`<div class="row spread"><h2>Elternbereich <button class="pill kidpill" data-a="kid-menu" aria-expanded="${!!ui.kidMenu}" aria-label="Kind wechseln">${esc(kidLabel(S.kidName))} ${ui.kidMenu?'▲':'▼'}</button></h2><span class="row" style="gap:8px">${helpBtn('page:'+pg)}<button class="btn small" data-a="lock">Sperren</button></span></div>`;
   if(ui.kidMenu)h+=`<div class="themelist kidmenu">${PROF.list.map(p=>{const on=p.key===PROF.cur;return `<button class="theme ${on?'on':''}" data-a="kid-switch" data-k="${esc(p.key)}">${on?'✓ ':''}${esc(kidLabel(on?S.kidName:p.name))}</button>`;}).join('')}<button class="theme" data-a="kid-new">+ Weiteres Kind anlegen</button></div>`;
-  h+=`<div class="ptabs" role="tablist" aria-label="Seiten">${PPAGES.map(([k,t,,ic])=>`<button role="tab" aria-selected="${pg===k}" class="${pg===k?'on':''}" data-a="ppage" data-p="${k}"><span class="pi" aria-hidden="true">${ic}</span>${t}</button>`).join('')}</div>`;
+  h+=`<div class="ptabs" role="tablist" aria-label="Seiten">${PPAGES.map(([k,t,,ic])=>`<button role="tab" aria-selected="${pg===k}" class="${pg===k?'on':''}" data-a="ppage" data-p="${k}"><span class="pi" aria-hidden="true">${ic}</span>${esc(t)}</button>`).join('')}</div>`;
   if(pg!=='settings')h+=scopeBar();
   if(L&&(L.cards.length||L.vocab.length)&&(!S.lastBackup||Date.now()-S.lastBackup>14*864e5))h+=`<div class="busy">Die letzte Sicherung ist ${S.lastBackup?'älter als 14 Tage':'noch nicht gemacht'}. Bitte eine Sicherung speichern, damit Karten und Fortschritt nicht verloren gehen.${pg==='settings'?'':`<div style="margin-top:8px"><button class="btn small" data-a="ppage" data-p="settings" data-s="backup">Zur Sicherung</button></div>`}</div>`;
   const one=ui.pscope!=='all',needOne=t=>`<section class="psec"><h3>${t}</h3><p class="note" style="margin:0 0 10px">Gehört zu einer Sprache. Wähle oben „Einzelne Sprache“.</p></section>`;
@@ -1359,8 +1359,9 @@ function vParent(){
   }else if(pg==='cards'){
     h+=one?sec('cards','Karten',L?pCards(L):noLang())+sec('backs','Kartenrücken',L?pBacks(L):noLang()):needOne('Karten &amp; Kartenrücken');
   }else if(pg==='rewards'){
+    h+=sec('reward','Punkte &amp; Abfrage',L?pReward(L):noLang())+sec('streak','Serien-Belohnung',pStreak());
     h+=one?sec('prizes','Spezielle Belohnungen',L?pPrizes(L):noLang()):needOne('Spezielle Belohnungen');
-    h+=sec('streak','Serien-Belohnung',pStreak())+sec('reward','Punkte &amp; Abfrage',L?pReward(L):noLang())+sec('pomo','Lernpause',pPomo());
+    h+=sec('pomo','Lernpause',pPomo());
   }else{
     h+=sec('kids','Kinder',pKids())+sec('sync','Abgleich mit anderem Handy',pSync())+sec('backup','Sicherung &amp; PIN',pBackup());
   }
@@ -1412,12 +1413,13 @@ function pCards(L){
   ${IMG[PACK_KEY]?`<div style="margin-top:8px">${confBtn('del-packimg:x','Zurücksetzen','block')}</div>`:''}</div></div>
   <p class="note">Wird auf der Startseite und beim Öffnen der Päckchen gezeigt. Ein schwarzer Hintergrund wird automatisch entfernt. Das Bild bleibt auf diesem Handy und ist in der Sicherung enthalten.</p>
   <div id="busy" class="busy" ${ui.busy?'':'hidden'}>${esc(ui.busy)}</div>
-  <p class="note" style="margin-top:12px">${L.cards.length} Karten · ${cnt}</p>
+  <button class="subhead" data-a="toggle-cardlist" aria-expanded="${!!ui.cardsOpen}"><span>Vorhandene Karten (${L.cards.length})</span><span>${ui.cardsOpen?'−':'+'}</span></button>
+  ${ui.cardsOpen?`<p class="note" style="margin-top:12px">${cnt}</p>
   ${missingImgs(L)?`<button class="btn block" data-a="merge-dups" style="margin-bottom:8px">Doppelte Karten zusammenführen</button><p class="note">Hat eine Karte ohne Bild eine gleichnamige Karte mit Bild, bekommt sie deren Bild. Das Duplikat verschwindet, Seltenheit und gesammelte Karten bleiben erhalten.</p>`:''}
   <div class="row" style="margin:8px 0"><button class="btn small ${ui.selMode?'primary':''}" data-a="sel-mode">${ui.selMode?'Auswahl beenden':'Auswählen'}</button>
   ${ui.selMode?`<button class="btn small" data-a="sel-all">Alle</button><button class="btn small" data-a="sel-missing">Ohne Bild (${missingImgs(L)})</button><button class="btn small" data-a="sel-none">Keine</button>`:''}</div>
   ${ui.selMode?`<div class="row" style="margin-bottom:8px"><span class="pill">${ui.cardSel.length} ausgewählt</span>${ui.cardSel.length?confBtn('del-sel:x','Ausgewählte löschen (' + ui.cardSel.length + ')'):''}</div>`:''}
-  <div class="grid">${L.cards.map(c=>ui.selMode?`<button class="tile ${ui.cardSel.includes(c.id)?'selected':''}" data-a="sel-card" data-id="${c.id}" aria-pressed="${ui.cardSel.includes(c.id)}">${cardFace(c,false,0)}<span class="selmark">${ui.cardSel.includes(c.id)?'✓':''}</span></button>`:`<button class="tile" data-a="edit-card" data-id="${c.id}">${cardFace(c,false,0)}</button>`).join('')}</div>
+  <div class="grid">${L.cards.map(c=>ui.selMode?`<button class="tile ${ui.cardSel.includes(c.id)?'selected':''}" data-a="sel-card" data-id="${c.id}" aria-pressed="${ui.cardSel.includes(c.id)}">${cardFace(c,false,0)}<span class="selmark">${ui.cardSel.includes(c.id)?'✓':''}</span></button>`:`<button class="tile" data-a="edit-card" data-id="${c.id}">${cardFace(c,false,0)}</button>`).join('')}</div>`:''}
   </div>`;
 }
 function pPrizes(L){
@@ -2102,6 +2104,8 @@ document.addEventListener('click',async e=>{
     case 'del-back':{if(!ask(d.key))break;const id=d.key.split(':')[1];S.customBacks=S.customBacks.filter(b=>b.id!==id);S.langs.forEach(x=>{if(x.back===id)delete x.back;});await delImg('back:'+id);save();render();toast('Rücken gelöscht');break;}
     case 'theme-toggle':ui.themeOpen=!ui.themeOpen;render();break;
     case 'toggle-cats':ui.cats=!ui.cats;render();break;
+    case 'toggle-cardlist':ui.cardsOpen=!ui.cardsOpen;if(!ui.cardsOpen){ui.selMode=false;ui.cardSel=[];}render();break;
+    case 'toggle-backlist':ui.backsOpen=!ui.backsOpen;render();break;
     case 'open-unit':ui.openUnit=ui.openUnit===d.u?'':d.u;render();break;
     case 'rename-unit':ui.modal={t:'unit',u:d.u};render();break;
     case 'save-unit':{

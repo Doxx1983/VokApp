@@ -6,7 +6,7 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 ## Arbeitsweise
 - Antworten an Dominic: Deutsch, kurz und präzise.
 - Commit-Trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` und `Claude-Session: <Session-URL>`. Push: `git push -q origin main`.
-- Nach jeder Änderung: `sw.js` Cache-Version `woerter-sammler-vNN` erhöhen (aktuell v52), Tests laufen lassen, committen, pushen. Nutzer muss die App danach einmal neu laden.
+- Nach jeder Änderung: `sw.js` Cache-Version `woerter-sammler-vNN` erhöhen (aktuell v53), Tests laufen lassen, committen, pushen. Nutzer muss die App danach einmal neu laden.
 - Tests (Node, ohne Abhängigkeiten): `node tests/logic.test.js`, `tests/stats.test.js`, `tests/pomo.test.js`, `tests/sync.test.js`, `tests/smoke.js` (VM mit DOM-Stubs). `node --check` auf das extrahierte Script. Neue Features immer im Smoke-Test abdecken.
 - `pkill -f` nicht verwenden (beendet die eigene Shell).
 
@@ -16,7 +16,7 @@ Repo: Doxx1983/VokApp · Live: https://doxx1983.github.io/VokApp/ · Branch `mai
 - Testbare Logik zwischen `//LOGIC-START` und `//LOGIC-END`: Antwortprüfung (norm/lev/checkAnswer), Leitner (Box 1–5), `pickSession`, `drawCards`, `packDraw`, `SPECIAL_PACKS`, `parseVocab`, `parseSections`, `sortWords`/`wLevel`, Streak-Funktionen, Themes, ZIP-Import, Statistik-Log, Pomodoro (`pomoStep` …).
 - Ansichten via `render()`: home, quiz, summary, pack, album, list, stats, options, parent. Navigation unten: Lernen, Vokabeln, Album, Statistik, Optionen, Eltern. Klicks per Delegation auf `[data-a]` (`switch(d.a)`), Eingaben über `data-change`. Modals über `ui.modal`.
 - Hilfe: `HELP`-Objekt (Texte je Bereich/Abschnitt), `helpBtn`, `helpModal`; „? Hilfe“ neben dem Sprach-Dropdown. Im Elternbereich eine Hilfe je Seite (`helpBtn('page:<seite>')`, fasst die `HELP`-Texte der Abschnitte + `HELP.parent` zusammen).
-- Elternbereich als vier Seiten (`PPAGES`, `ui.ppage`, Reiter oben, `data-a="ppage"`): Wörter (lang, vocab, hard), Karten (cards, backs), Belohnungen (prizes, streak, reward, pomo), Einstellungen (kids, sync, backup). Abschnitte fest als `section.psec#sec-<k>` (keine Aufklapp-Abschnitte mehr). Sprachauswahl (`scopeBar`) auf allen Seiten außer Einstellungen. `ui.sec` springt zu einem Abschnitt (wählt die Seite über `pageOf`). Seitenwechsel landet im Verlauf (`{v:'parent',p}`).
+- Elternbereich als vier Seiten (`PPAGES`, `ui.ppage`, Reiter oben, `data-a="ppage"`): Sprachen (lang, vocab, hard), Karten (cards, backs; Karten- und Rückenliste einklappbar über `ui.cardsOpen`/`ui.backsOpen`), Lernen & Belohnungen (reward, streak, prizes, pomo), Administration (kids, sync, backup). Abschnitte fest als `section.psec#sec-<k>` (keine Aufklapp-Abschnitte mehr). Sprachauswahl (`scopeBar`) auf allen Seiten außer Administration. `ui.sec` springt zu einem Abschnitt (wählt die Seite über `pageOf`). Seitenwechsel landet im Verlauf (`{v:'parent',p}`).
 - Browser-Zurück: History API (`pushHist`, popstate) springt in der App einen Bildschirm zurück.
 - Neuladen: `saveNav`/`restoreNav` (sessionStorage `woerter-sammler-ansicht`, bei jedem `render`) stellt Ansicht, Abschnitt und Scrollposition wieder her; Elternbereich bleibt nach Neuladen entsperrt. `render()` sperrt den Elternbereich, sobald eine andere Ansicht gezeigt wird, also fragt Vor/Zurück/Navigation danach wieder nach der PIN. Lernrunde/Päckchen → Start.
 

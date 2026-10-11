@@ -190,6 +190,7 @@ const test=`
   const mk=(id,name,img,own)=>{L.cards.push({id,name,rarity:'s'});if(img){IMG[id]='u';BLOBS[id]=new Blob([id]);}if(own)L.owned[id]=own;};
   mk('a1','Glurak',false,2);mk('a2','Pikachu',false,0);mk('a3','Mew',false,1);mk('b1','Glurak',true,1);mk('b2','pikachu',true,0);mk('c1','Evoli',true,3);
   await click({a:'nav',v:'parent'});stub('#pin').value='4711';await click({a:'pin-go'});await click({a:'sec',k:'cards'});if(ui.sec!=='cards')await click({a:'sec',k:'cards'});
+   assert(app().includes('Vorhandene Karten')&&!app().includes('data-a="sel-mode"'),'Kartenliste eingeklappt');await click({a:'toggle-cardlist'});
   assert(app().includes('Doppelte Karten zusammenführen')&&app().includes('Auswählen'));
   await click({a:'merge-dups'});assert.deepEqual(L.cards.map(c=>c.id).sort(),['a1','a2','a3','c1'],'Duplikate weg, alte Slots bleiben');assert(IMG.a1&&IMG.a2&&!IMG.a3&&!IMG.b1);assert.equal(L.owned.a1,3,'gesammelte Karten summiert');assert.equal(L.cards.find(c=>c.id==='a1').rarity,'s');
   await click({a:'sel-mode'});assert(ui.selMode&&app().includes('data-a="sel-card"'));
@@ -205,8 +206,12 @@ const test=`
   for(const k of Object.keys(HELP)){await click({a:'help',k});assert(app().includes(esc(HELP[k][0])),'Hilfetext '+k);await click({a:'close-modal'});}
   ui.view='parent';ui.unlocked=true;ui.pscope='one';for(const k of ['lang','vocab','hard','cards','prizes','backs','streak','pomo','reward','kids','sync','backup']){ui.sec=k;render();assert(app().includes('id="sec-'+k+'"')&&app().includes('data-k="page:'+pageOf(k)+'"')&&app().includes('data-a="pscope"')===(pageOf(k)!=='settings'),'Seite mit Abschnitt, Hilfe und Sprachauswahl (nicht bei Einstellungen): '+k);}
   for(const [p,t,ks] of PPAGES){ui.sec='';await click({a:'ppage',p});assert.equal(ui.ppage,p);ks.forEach(k=>assert(app().includes('id="sec-'+k+'"'),p+' zeigt '+k));
-    ui.modal={t:'help',k:'page:'+p};assert(vModal().includes(t)&&ks.every(k=>vModal().includes(esc(HELP[k][0]))),'Seitenhilfe '+p);ui.modal=null;}
+    ui.modal={t:'help',k:'page:'+p};assert(vModal().includes(esc(t))&&ks.every(k=>vModal().includes(esc(HELP[k][0]))),'Seitenhilfe '+p);ui.modal=null;}
   assert(!app().includes('sechead'),'keine aufklappbaren Abschnitte');
+  S.customBacks.push({id:'cbx',name:'X'});ui.sec='backs';render();assert(app().includes('Eigene Kartenrücken (1)')&&!app().includes('del-back:cbx'),'Rückenliste eingeklappt');
+  await click({a:'toggle-backlist'});assert(app().includes('del-back:cbx'));S.customBacks.pop();ui.backsOpen=false;
+  ui.sec='';await click({a:'ppage',p:'rewards'});{const a=app();assert(a.indexOf('id="sec-reward"')<a.indexOf('id="sec-streak"')&&a.indexOf('id="sec-streak"')<a.indexOf('id="sec-prizes"')&&a.indexOf('id="sec-prizes"')<a.indexOf('id="sec-pomo"'),'Reihenfolge Lernen & Belohnungen');
+   assert(a.includes('Lernen &amp; Belohnungen')&&a.includes('Administration')&&a.includes('>Sprachen</button>'),'Reiternamen');}
   ui.pscope='all';await click({a:'ppage',p:'cards'});assert(app().includes('Einzelne Sprache')&&!app().includes('id="sec-cards"'));ui.pscope='one';
   ui.unlocked=false;ui.view='home';render();
   // Geltungsbereich Elternbereich
