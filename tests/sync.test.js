@@ -2,7 +2,7 @@
 const fs=require('fs'),assert=require('assert');
 const h=fs.readFileSync(require('path').join(__dirname,'..','index.html'),'utf8');
 const l=h.split('//LOGIC-START')[1].split('//LOGIC-END')[0];
-const A=new Function(l+';return {migrate,syncSig,syncStamp,syncPayload,syncMerge}')();
+const A=new Function(l+';return {migrate,syncSig,syncStamp,syncPayload,syncMerge,syncTarget}')();
 const clone=o=>JSON.parse(JSON.stringify(o));
 let T=1000000;
 // Gerät: Zustand + Signatur, edit() ändert und speichert wie save() in der App
@@ -31,7 +31,7 @@ assert(W(kid,'dog').lt>0&&!W(kid,'dog').mt,'Lernen stempelt nur den Lernstand');
 par.edit(S=>{const L=S.langs[0];L.vocab.push(word('b4','chair','Stuhl',{tags:['Möbel']}));L.vocab=L.vocab.filter(w=>w.f!=='cat');
   L.goal=50;S.pomoCfg.work=15;L.packs++;L.gifts.push({id:'g1',ts:T,n:1});S.rewards.push({id:'r1',kind:'reward',text:'Eis essen',rarity:'s',lang:'LB',active:true,once:false});});
 assert(par.S.del.b2&&par.S.del['w:englisch:cat=katze'],'Löschung gemerkt (Id + Wortpaar)');
-assert(par.S.langs[0].smt>0&&par.S.mt.pomoCfg>0&&W(par,'chair').mt>0);
+assert(par.S.langs[0].smt.goal>0&&!par.S.langs[0].smt.dir&&par.S.mt['pomoCfg.work']>0&&!par.S.mt['pomoCfg.brk']&&W(par,'chair').mt>0,'je Feld gestempelt');
 assert(!par.S.langs[0].pmt,'Geschenk ändert den Lernstand-Zeitpunkt nicht');
 
 // Datei enthält keine Bilder, Karten, PIN und Geräte-Optionen
@@ -109,6 +109,36 @@ par.load(kid.file());assert.equal(W(par,'chair').d,'Stuhl / Sessel','und kommt z
 kid.edit(S=>{W(kid,'chair').tags=['Zuhause'];});
 par.edit(S=>{S.langs[0].vocab=S.langs[0].vocab.filter(w=>w.f!=='chair');});
 kid.load(par.file());assert(!W(kid,'chair'),'Löschen nach der Änderung gewinnt');
+
+// Datei der Eltern wird spät geladen: Was das Kind inzwischen selbst ändert, überschreibt keine anderen Elterneinstellungen
+par.edit(S=>{S.streakCfg.days=7;S.streakCfg.nextPack='mega';S.langs[0].ppr=20;S.rewards.push({id:'r2',kind:'reward',text:'Kino',rarity:'e',lang:'all',active:true,once:true});});
+kid.load(par.file());
+const late=par.file();                       // Datei erstellt …
+par.edit(S=>{S.pomoCfg.idle=9;});            // … Eltern ändern danach noch etwas (kommt erst mit der nächsten Datei)
+kid.edit(S=>{S.streakCfg.nextPack='';S.rewards.find(r=>r.id==='r2').active=false;S.langs[0].sessionSize=30;S.langs[0].points=5;});  // Serie verbraucht, Belohnung gewonnen, Runde 30
+par.edit(S=>{S.rewards.find(r=>r.id==='r2').text='Kino mit Popcorn';S.langs[0].goal=60;});
+kid.load(late);kid.load(par.file());          // … und erst viel später geladen
+assert.equal(kid.S.streakCfg.days,7);assert.equal(kid.S.streakCfg.nextPack,'','verbrauchte Serien-Belohnung bleibt verbraucht');
+assert.equal(kid.S.langs[0].goal,60);assert.equal(kid.S.langs[0].ppr,20);assert.equal(kid.S.langs[0].sessionSize,30,'Runde ist Sache des Kindes');
+const r2=kid.S.rewards.find(r=>r.id==='r2');assert(r2.text==='Kino mit Popcorn'&&r2.active===false,'Text von den Eltern, gewonnen beim Kind');
+assert.equal(kid.S.pomoCfg.idle,9);assert.equal(kid.S.langs[0].points,5);
+// Elternimport: die Datei des Kindes ändert keine Elterneinstellungen, nur was das Kind geändert hat
+par.load(kid.file());assert.equal(par.S.streakCfg.days,7);assert.equal(par.S.streakCfg.nextPack,'');assert.equal(par.S.langs[0].goal,60);
+assert.equal(par.S.rewards.find(r=>r.id==='r2').text,'Kino mit Popcorn');assert.equal(par.S.langs[0].sessionSize,10,'Runde bleibt auf dem Eltern-Handy');
+
+// Zeitstempel aus v48 (eine Zahl je Gruppe) werden übernommen
+const old=A.migrate({v:1,rewards:[{id:'x',text:'a',mt:5}],streakCfg:{days:3},pomoCfg:{work:20},mt:{streakCfg:7},langs:[lang('L1','Englisch',[],{smt:9})],activeLang:'L1'});
+assert.equal(old.mt['streakCfg.days'],7);assert.equal(old.rewards[0].mt.text,5);assert.equal(old.langs[0].smt.goal,9);assert(old.pid);
+
+// Zuordnung zum Kind
+const P=[{key:'k1',pid:'p1',name:'Mia'},{key:'k2',pid:'p2',name:'Ben'}];
+assert.deepEqual(A.syncTarget({pid:'p2'},P,'k1',true,false),{key:'k2'},'Eltern: richtiges Kind');
+assert(A.syncTarget({pid:'p9'},P,'k1',true,false).choose,'Eltern: unbekannt → auswählen');
+assert.deepEqual(A.syncTarget({pid:'p9'},[P[0]],'k1',false,false),{key:'k1',adopt:true},'erstes Mal: verknüpfen');
+assert.deepEqual(A.syncTarget({pid:'p1'},P,'k1',true,true),{key:'k1'},'Kind: eigene Datei');
+assert(A.syncTarget({pid:'p2',name:'Ben'},P,'k1',true,true).err.includes('Ben'),'Kind: Datei für Geschwister abgelehnt');
+assert.deepEqual(A.syncTarget({pid:'p9'},[P[0]],'k1',false,true),{key:'k1',adopt:true},'Kind: erstes Mal verknüpfen');
+assert(A.syncTarget({pid:'p9'},[P[0]],'k1',true,true).err,'Kind: schon verknüpft');
 
 // Vollständige Sicherung als Abgleich-Quelle (ohne kind) funktioniert über syncPayload
 const full={app:'woerter-sammler',v:1,state:clone(par.S),images:{x:'data:image/png;base64,AA'}};

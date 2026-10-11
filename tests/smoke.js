@@ -8,7 +8,7 @@ class FakeSR{start(){FakeSR.lastLang=this.lang;setTimeout(()=>{if(say.v!==null)t
 const win={scrollTo(){},addEventListener(t,f){handlers['w_'+t]=f;}};win.window=win;
 const ctx={console,setTimeout,clearTimeout,setInterval:()=>0,Math,Date,JSON,Promise,Set,Array,Object,String,Number,isFinite,URL,Blob,Intl,
   document:{documentElement:{style:{props:{},removeProperty(p){delete this.props[p];},setProperty(p,v){this.props[p]=v;}}},querySelector:stub,querySelectorAll:()=>[],addEventListener:(t,f)=>{handlers[t]=f;},body:{classList:{toggle(){}}},createElement:()=>({getContext:()=>({}),toBlob(cb){cb(new Blob(['x']))},click(){},remove(){}})},
-  window:win,localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>{store[k]=v;}},navigator:{},location:{protocol:'https:'},
+  window:win,localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>{store[k]=v;},removeItem:k=>{delete store[k];}},navigator:{},location:{protocol:'https:'},
   history:{pushed:[],pushState(st){this.pushed.push(st);},replaceState(){}},require_assert:assert,stub,process,handlers,FakeSR,say};
 
 const test=`
@@ -267,11 +267,11 @@ const test=`
  // Abgleich mit anderem Handy (Sync-Datei)
  {document.body.appendChild=()=>{};const Lc=curLang();ui.view='parent';ui.unlocked=true;ui.pscope='one';ui.sec='sync';render();
   assert(app().includes('Abgleich-Datei senden')&&app().includes('data-change="sync-import"')&&HELP.sync,'Abschnitt Abgleich + Hilfe');
-  assert(Lc.vocab.some(w=>w.mt>0)&&Lc.smt>0,'Änderungen haben Zeitstempel');
+  assert(Lc.vocab.some(w=>w.mt>0)&&tmax(Lc.smt)>0,'Änderungen haben Zeitstempel');
   await click({a:'sync-export'});
   const npk=Lc.packs;ui.sec='reward';render();await click({a:'gift'});assert(Lc.packs===npk+1&&Lc.gifts.length===1,'Geschenk vermerkt');ui.sec='sync';render();
   const now=Date.now(),other=JSON.parse(JSON.stringify(S));other.dev='anderes';const Lo=other.langs.find(l=>l.id===Lc.id);
-  Lo.vocab.push({id:'sy1',f:'window',d:'Fenster',tags:['Zuhause'],box:1,due:0,seen:0,right:0,wrong:0,mt:now+5000});Lo.goal=77;Lo.smt=now+5000;
+  Lo.vocab.push({id:'sy1',f:'window',d:'Fenster',tags:['Zuhause'],box:1,due:0,seen:0,right:0,wrong:0,mt:now+5000});Lo.goal=77;Lo.smt={goal:now+5000};
   const change=async txt=>{await handlers.change({target:{dataset:{change:'sync-import'},files:[{text:async()=>txt}],value:''}});await tick();};
   await change(JSON.stringify(syncPayload(other,now)));
   assert(ui.pendingSync&&app().includes('1 neues Wort')&&app().includes('data-a="sync-yes"'),'Vorschau');
@@ -286,6 +286,41 @@ const test=`
   await change(JSON.stringify(syncPayload(S,now)));assert(!ui.pendingSync,'eigene Datei wird erkannt');
   await change('kaputt');assert(!ui.pendingSync);
   await change(JSON.stringify({app:'woerter-sammler',v:1,state:other,images:{}}));assert(ui.pendingSync,'Sicherungsdatei als Quelle');await click({a:'sync-no'});
+  ui.unlocked=false;ui.view='home';render();}
+ // Abgleich durch das Kind in den Optionen, mehrere Kinder
+ {const change=async(k,txt)=>{await handlers.change({target:{dataset:{change:k},files:[{text:async()=>txt}],value:''}});await tick();};
+  ui.unlocked=false;await click({a:'nav',v:'options'});
+  assert(app().includes('Abgleich mit Mama und Papa')&&app().includes('data-change="sync-import-kid"')&&!app().includes('rückgängig'),'Optionen: senden/laden, kein Rückgängig');
+  const now=Date.now(),par=JSON.parse(JSON.stringify(S));par.dev='eltern';const Lp=par.langs.find(l=>l.id===curLang().id);
+  Lp.vocab.push({id:'sk1',f:'door',d:'Tür',tags:['Zuhause'],box:1,due:0,seen:0,right:0,wrong:0,mt:now+5000});
+  await change('sync-import-kid',JSON.stringify({app:'woerter-sammler',v:1,state:par,images:{}}));assert(!ui.pendingSync,'Kind: keine Sicherungen');
+  const fNew=JSON.stringify(syncPayload(par,now+100));
+  await change('sync-import-kid',fNew);assert(ui.pendingSync&&app().includes('1 neues Wort'),'Kind: Vorschau in den Optionen');
+  await click({a:'sync-yes'});assert(curLang().vocab.some(w=>w.id==='sk1'),'Kind: abgeglichen');assert(S.syncSeen.eltern===now+100);
+  await change('sync-import-kid',JSON.stringify(syncPayload(par,now-1000)));assert(!ui.pendingSync,'Kind: ältere Datei abgelehnt');
+  const sib=JSON.parse(fNew);sib.pid='geschwister';sib.name='Ben';sib.ts=now+200;
+  await change('sync-import-kid',JSON.stringify(sib));assert(!ui.pendingSync,'Kind: Datei für Geschwister abgelehnt');
+  // Eltern-Handy mit zwei Kindern
+  ui.view='parent';ui.unlocked=true;ui.sec='kids';render();assert(app().includes('Weiteres Kind anlegen'));
+  stub('#kidname').value='Mia';await handlers.change({target:{dataset:{change:'kidname'},value:'Mia'}});assert.equal(S.kidName,'Mia');
+  const miaPid=S.pid,miaWords=curLang().vocab.length,pin=S.pinHash;
+  stub('#newkid').value='Ben';await click({a:'kid-add'});assert.equal(S.kidName,'Ben');assert.equal(PROF.list.length,2);assert.equal(S.pinHash,pin,'PIN gilt für alle');
+  assert(app().includes('Wechseln')&&app().includes('Mia'),'Liste der Kinder');
+  const benPid=S.pid;assert.notEqual(benPid,miaPid);
+  // Datei von Mias Handy, während Ben ausgewählt ist: wird Mia zugeordnet
+  const miaFile=JSON.parse(fNew);miaFile.pid=miaPid;miaFile.name='Mia';miaFile.dev='mia-handy';miaFile.ts=now+300;
+  ui.sec='sync';render();await change('sync-import',JSON.stringify(miaFile));
+  assert.equal(S.kidName,'Mia','automatisch zu Mia gewechselt');assert(ui.pendingSync);await click({a:'sync-no'});
+  // unbekanntes Kind: Auswahl, neues Kind anlegen
+  const tom=JSON.parse(fNew);tom.pid='tom-pid';tom.name='Tom';tom.dev='tom-handy';
+  await change('sync-import',JSON.stringify(tom));assert(ui.syncChoose&&app().includes('Zu welchem Kind'),'Auswahl');
+  await click({a:'sync-new'});assert.equal(S.kidName,'Tom');assert.equal(S.pid,'tom-pid');assert(ui.pendingSync);await click({a:'sync-yes'});
+  assert(curLang()&&curLang().vocab.some(w=>w.id==='sk1'),'Toms Daten');assert.equal(PROF.list.length,3);
+  ui.view='home';render();assert(app().includes('Profil: <b>Tom'),'Profil auf der Startseite');
+  ui.view='parent';ui.sec='kids';render();
+  const benKey=PROF.list.find(p=>p.name==='Ben').key;await click({a:'kid-del',key:'kid-del:'+benKey});await click({a:'kid-del',key:'kid-del:'+benKey});
+  assert.equal(PROF.list.length,2);assert(!localStorage.getItem(benKey),'Ben gelöscht');
+  await click({a:'kid-switch',k:PROF.list.find(p=>p.name==='Mia').key});assert.equal(S.kidName,'Mia');assert.equal(curLang().vocab.length,miaWords,'Mias Daten unverändert');
   ui.unlocked=false;ui.view='home';render();}
  // Altdaten migrieren
  console.log('SMOKE OK');

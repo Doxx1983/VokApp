@@ -548,7 +548,6 @@ function streakDue(count,days){return count>0&&days>0&&count%days===0;}
 function nextStreakTarget(count,days){return (Math.floor(count/days)+1)*days;}
 function migrate(s){
   s.mode=s.mode==='speak'?'speak':'write';
-  s.mt=s.mt&&typeof s.mt==='object'?s.mt:{};s.del=s.del&&typeof s.del==='object'?s.del:{};s.dev=s.dev||'d'+Math.random().toString(36).slice(2,10);
   s.rewards=Array.isArray(s.rewards)?s.rewards:[];
   s.cardBack=Math.min(Math.max(Math.round(+s.cardBack)||1,1),BACKS.length);
   s.customBacks=(Array.isArray(s.customBacks)?s.customBacks:[]).filter(b=>b&&typeof b.id==='string'&&b.id).map(b=>({id:b.id,name:String(b.name||'Eigener Rücken').slice(0,30)}));
@@ -572,6 +571,7 @@ function migrate(s){
     l.points=l.points||0;l.packs=l.packs||0;l.sp=(Array.isArray(l.sp)?l.sp:[]).filter(t=>SPECIAL_PACKS[t]);l.totalPoints=l.totalPoints||0;
   });
   if(!s.langs.find(l=>l.id===s.activeLang)) s.activeLang=s.langs[0]?s.langs[0].id:null;
+  syncMigrate(s);
   return s;
 }
 /* Lernprotokoll pro Tag: p Punkte, s Sekunden, a beantwortete Wörter, r davon beim ersten Versuch richtig */
@@ -615,16 +615,18 @@ function pomoStep(p,now,inQuiz,tnow,cfg){
 function pomoOnStart(p,now,cfg){p=pomoStep(p,now,false,0,cfg);if(p&&p.lock)return p;return p?{...p,idle:null}:{start:now,idle:null};}
 function pomoOnEnd(p,now){return p&&!p.lock?{...p,idle:now}:p;}
 /* Abgleich zwischen zwei Handys (Sync-Datei, ohne Server).
-   Zeitstempel entstehen automatisch: save() vergleicht mit dem letzten Stand (syncSig) und stempelt geänderte Gruppen (syncStamp).
-   Wort: mt = Inhalt, ht = „Zu schwer“-Meldung, lt = Lernstand. Sprache: smt = Einstellungen, pmt = Punkte/Päckchen.
-   Global: S.mt[streakCfg|pomoCfg], Belohnung r.mt. Gelöschtes: S.del[id oder Schlüssel] = Zeitpunkt.
-   Geräteeigen (nicht abgeglichen): PIN, Lernpause-Sperre, Farbschema, Modus, Kartenrücken, Karten/Album/Bilder. */
+   Zeitstempel entstehen automatisch: save() vergleicht mit dem letzten Stand (syncSig) und stempelt jede geänderte Einstellung einzeln (syncStamp).
+   Maßgeblich ist also der Zeitpunkt der Änderung, nicht wann die Datei erstellt oder geladen wird (Zeit möglichst vom Server, siehe stampNow).
+   Wort: mt = Inhalt, ht = „Zu schwer“-Meldung, lt = Lernstand. Sprache: smt = {Feld: Zeit}, pmt = Punkte/Päckchen.
+   Global: S.mt['streakCfg.days' …, 'kidName'], Belohnung r.mt = {Feld: Zeit}. Gelöschtes: S.del[id oder Schlüssel] = Zeitpunkt.
+   Geräteeigen (nicht abgeglichen): PIN, Lernpause-Sperre, Farbschema, Modus, Wörter pro Runde, Kartenrücken, Karten/Album/Bilder. */
 const SYNC_W={mt:['f','d','tags','off'],ht:['hard','hardTs'],lt:['box','due','seen','right','wrong']};
-const SYNC_L=['name','dir','sessionSize','goal','packSize','ppr','speechLang'];
-const SYNC_G={streakCfg:'Serien-Belohnung',pomoCfg:'Lernpause'};
-const SYNC_LOCAL_L=['cards','owned','back'];
+const SYNC_L=['name','dir','goal','packSize','ppr','speechLang'];
+const SYNC_G={streakCfg:'Serien-Belohnung',pomoCfg:'Lernpause',kidName:'Name des Kindes'};
+const SYNC_LOCAL_L=['cards','owned','back','sessionSize'];
 const sjs=v=>JSON.stringify(v===undefined?null:v);
 const spick=(o,ks)=>sjs(ks.map(k=>o[k]));
+const tmax=o=>Math.max(0,...Object.values(o&&typeof o==='object'?o:{}).map(v=>+v||0));
 const giftSum=L=>(L.gifts||[]).reduce((a,g)=>a+(+g.n||0),0);
 const progSig=L=>sjs([L.points,L.totalPoints,(L.packs||0)-giftSum(L),L.sp]);
 const wKey=(lname,w)=>'w:'+norm(lname)+':'+norm(w.f)+'='+norm(w.d);
@@ -632,13 +634,29 @@ const lKey=name=>'l:'+norm(name);
 const sameId=(a,b)=>a.id===b.id||(a.aka||[]).includes(b.id)||(b.aka||[]).includes(a.id);
 const delTs=(del,ids)=>Math.max(0,...ids.map(i=>+del[i]||0));
 const idsOf=(x,key)=>[x.id,...(x.aka||[]),key];
+/* globale Einstellungen als Pfade: 'streakCfg.days', 'pomoCfg.work', 'kidName' … */
+function gPaths(s){const o={};for(const k in SYNC_G){const v=s[k];if(v&&typeof v==='object')for(const f in v)o[k+'.'+f]=sjs(v[f]);else o[k]=sjs(v);}return o;}
+const gGet=(s,p)=>{const [a,b]=p.split('.');return b===undefined?s[a]:(s[a]||{})[b];};
+const gSet=(s,p,v)=>{const [a,b]=p.split('.');if(b===undefined)s[a]=v;else{s[a]=s[a]&&typeof s[a]==='object'?s[a]:{};s[a][b]=v;}};
+const rFields=r=>{const o={};for(const k in r)if(k!=='mt'&&k!=='id')o[k]=sjs(r[k]);return o;};
+/* Zeitstempel aus älteren Versionen (eine Zahl je Gruppe) auf einzelne Felder verteilen */
+function syncMigrate(s){
+  s.mt=s.mt&&typeof s.mt==='object'?s.mt:{};s.del=s.del&&typeof s.del==='object'?s.del:{};
+  s.dev=s.dev||'d'+Math.random().toString(36).slice(2,10);s.pid=s.pid||'p'+Math.random().toString(36).slice(2,10);
+  s.kidName=typeof s.kidName==='string'?s.kidName.slice(0,30):'';
+  s.syncSeen=s.syncSeen&&typeof s.syncSeen==='object'?s.syncSeen:{};
+  for(const k of ['streakCfg','pomoCfg'])if(typeof s.mt[k]==='number'){const n=s.mt[k];delete s.mt[k];for(const f in (s[k]||{}))s.mt[k+'.'+f]=n;}
+  (s.rewards||[]).forEach(r=>{if(typeof r.mt==='number'){const n=r.mt;r.mt={};for(const f in rFields(r))r.mt[f]=n;}else if(!r.mt||typeof r.mt!=='object')r.mt={};});
+  (s.langs||[]).forEach(L=>{if(typeof L.smt==='number'){const n=L.smt;L.smt={};SYNC_L.forEach(f=>L.smt[f]=n);}else if(!L.smt||typeof L.smt!=='object')L.smt={};});
+  return s;
+}
 function syncSig(s){
-  const sig={g:{},r:{},l:{}};
-  for(const k in SYNC_G)sig.g[k]=sjs(s[k]);
-  (s.rewards||[]).forEach(r=>{const c={...r};delete c.mt;sig.r[r.id]=sjs(c);});
+  const sig={g:gPaths(s),r:{},l:{}};
+  (s.rewards||[]).forEach(r=>{sig.r[r.id]=rFields(r);});
   (s.langs||[]).forEach(L=>{
     const w={};(L.vocab||[]).forEach(x=>{w[x.id]={k:wKey(L.name,x),a:x.aka||[],mt:spick(x,SYNC_W.mt),ht:spick(x,SYNC_W.ht),lt:spick(x,SYNC_W.lt)};});
-    sig.l[L.id]={k:lKey(L.name),a:L.aka||[],s:spick(L,SYNC_L),p:progSig(L),w};
+    const ls={};SYNC_L.forEach(f=>ls[f]=sjs(L[f]));
+    sig.l[L.id]={k:lKey(L.name),a:L.aka||[],s:ls,p:progSig(L),w};
   });
   return sig;
 }
@@ -647,13 +665,14 @@ function syncStamp(prev,s,now){
   const cur=syncSig(s);if(!prev)return cur;
   s.mt=s.mt||{};s.del=s.del||{};
   const kill=ids=>ids.forEach(i=>{if(i)s.del[i]=now;});
-  for(const k in SYNC_G)if(prev.g[k]!==cur.g[k])s.mt[k]=now;
-  s.rewards.forEach(r=>{if(prev.r[r.id]!==cur.r[r.id])r.mt=now;});
+  for(const p in cur.g)if(prev.g[p]!==cur.g[p])s.mt[p]=now;
+  s.rewards.forEach(r=>{const p=prev.r[r.id]||{},c=cur.r[r.id];r.mt=r.mt&&typeof r.mt==='object'?r.mt:{};
+    for(const f in c)if(p[f]!==c[f])r.mt[f]=now;});
   for(const id in prev.r)if(!(id in cur.r))kill([id]);
   s.langs.forEach(L=>{
-    const p=prev.l[L.id],c=cur.l[L.id];
-    if(!p){L.smt=now;L.vocab.forEach(w=>{w.mt=now;});return;}
-    if(p.s!==c.s)L.smt=now;
+    const p=prev.l[L.id],c=cur.l[L.id];L.smt=L.smt&&typeof L.smt==='object'?L.smt:{};
+    if(!p){SYNC_L.forEach(f=>L.smt[f]=now);L.vocab.forEach(w=>{w.mt=now;});return;}
+    SYNC_L.forEach(f=>{if(p.s[f]!==c.s[f])L.smt[f]=now;});
     if(p.p!==c.p)L.pmt=now;
     L.vocab.forEach(w=>{const pw=p.w[w.id],cw=c.w[w.id];
       if(!pw){w.mt=now;return;}
@@ -667,36 +686,55 @@ function syncStamp(prev,s,now){
 function syncPayload(s,now){
   const st={mt:s.mt||{},del:s.del||{},streak:s.streak,rewards:s.rewards,langs:s.langs.map(L=>{const c={...L};SYNC_LOCAL_L.forEach(k=>delete c[k]);return c;})};
   for(const k in SYNC_G)st[k]=s[k];
-  return {app:'woerter-sammler',kind:'sync',v:1,dev:s.dev,ts:now,state:st};
+  return {app:'woerter-sammler',kind:'sync',v:2,dev:s.dev,pid:s.pid,name:s.kidName||'',ts:now,state:st};
+}
+/* Wohin gehört eine Datei? profiles: [{key,pid,name}], cur: Schlüssel des aktiven Kindes, synced: aktives Kind schon abgeglichen,
+   kid: Abgleich aus den Optionen (ohne PIN). Ergebnis: {key} (ggf. adopt: Kennung übernehmen), {choose:true} oder {err} */
+function syncTarget(f,profiles,cur,synced,kid){
+  const hit=profiles.find(p=>p.pid===f.pid);
+  if(kid){
+    if(hit&&hit.key===cur)return {key:cur};
+    if(!synced&&!hit)return {key:cur,adopt:true};
+    return {err:'Diese Datei gehört zu '+(f.name?f.name:'einem anderen Kind')+'. Bitte die Datei für dieses Handy nehmen.'};
+  }
+  if(hit)return {key:hit.key};
+  if(profiles.length===1&&!synced)return {key:cur,adopt:true};
+  return {choose:true};
 }
 /* führt den Stand eines anderen Handys (rem) in eine Kopie des eigenen (loc) ein; gibt {state,ch} zurück */
 function syncMerge(loc,rem,now){
-  const s=JSON.parse(JSON.stringify(loc)),r=JSON.parse(JSON.stringify(rem));
-  s.mt=s.mt||{};s.del=s.del||{};const rmt=r.mt||{},rdel=r.del||{};
+  const s=syncMigrate(JSON.parse(JSON.stringify(loc))),r=syncMigrate(JSON.parse(JSON.stringify(rem)));
+  const rmt=r.mt,rdel=r.del;
   const ch={g:[],langs:[],langsDel:[],rewards:0,wins:0,streak:false,n:0};
   const add=(o,k,n)=>{o[k]=(o[k]||0)+(n==null?1:n);ch.n+=(n==null?1:n);};
-  for(const k in SYNC_G){
-    if((+rmt[k]||0)>(+s.mt[k]||0)){if(sjs(r[k])!==sjs(s[k])&&r[k]){s[k]=r[k];ch.g.push(SYNC_G[k]);ch.n++;}s.mt[k]=rmt[k];}
+  /* globale Einstellungen: je Feld die neuere Änderung */
+  const rg=gPaths(r);
+  for(const p in rg){
+    if((+rmt[p]||0)>(+s.mt[p]||0)){
+      if(sjs(gGet(r,p))!==sjs(gGet(s,p))){gSet(s,p,JSON.parse(rg[p]));const lab=SYNC_G[p.split('.')[0]];if(!ch.g.includes(lab)){ch.g.push(lab);ch.n++;}}
+      s.mt[p]=rmt[p];
+    }
   }
   /* Sprachen */
   const lmap={},seen=new Set();
   (r.langs||[]).forEach(RL=>{
     const LL=s.langs.find(l=>!seen.has(l)&&sameId(l,RL))||s.langs.find(l=>!seen.has(l)&&norm(l.name)===norm(RL.name));
     if(!LL){
-      const t=delTs(s.del,idsOf(RL,lKey(RL.name)));if(t>0&&t>=Math.max(+RL.smt||0,+RL.pmt||0))return;
+      const t=delTs(s.del,idsOf(RL,lKey(RL.name)));if(t>0&&t>=Math.max(tmax(RL.smt),+RL.pmt||0))return;
       const nl={...RL,cards:[],owned:{}};delete nl.back;s.langs.push(nl);seen.add(nl);lmap[RL.id]=nl.id;
       ch.langs.push({name:RL.name,isNew:true,add:RL.vocab.length,upd:0,del:0,learn:0,prog:false,set:false});ch.n++;return;
     }
     seen.add(LL);lmap[RL.id]=LL.id;
     if(LL.id!==RL.id&&!(LL.aka||[]).includes(RL.id))LL.aka=[...(LL.aka||[]),RL.id];
     const c={name:LL.name,isNew:false,add:0,upd:0,del:0,learn:0,prog:false,set:false};
-    if((+RL.smt||0)>(+LL.smt||0)){if(spick(RL,SYNC_L)!==spick(LL,SYNC_L)){SYNC_L.forEach(k=>{if(RL[k]!==undefined)LL[k]=RL[k];});c.set=true;ch.n++;}LL.smt=RL.smt;}
+    SYNC_L.forEach(f=>{const rt=+RL.smt[f]||0;if(rt>(+LL.smt[f]||0)){if(RL[f]!==undefined&&sjs(RL[f])!==sjs(LL[f])){LL[f]=RL[f];c.set=true;}LL.smt[f]=rt;}});
+    if(c.set)ch.n++;
     /* Punkte & Päckchen: neuerer Stand zählt, Geschenke beider Seiten bleiben erhalten */
-    const lg=new Set((LL.gifts||[]).map(g=>g.id)),rg=new Set((RL.gifts||[]).map(g=>g.id));
+    const lg=new Set((LL.gifts||[]).map(g=>g.id)),rgf=new Set((RL.gifts||[]).map(g=>g.id));
     const before=sjs([LL.points,LL.packs,LL.sp,LL.totalPoints]);
     const remNewer=(+RL.pmt||0)>(+LL.pmt||0)||((+RL.pmt||0)===(+LL.pmt||0)&&(RL.totalPoints||0)>(LL.totalPoints||0));
     if(remNewer){
-      LL.packs=(RL.packs||0)+(LL.gifts||[]).filter(g=>!rg.has(g.id)).reduce((a,g)=>a+(+g.n||0),0);
+      LL.packs=(RL.packs||0)+(LL.gifts||[]).filter(g=>!rgf.has(g.id)).reduce((a,g)=>a+(+g.n||0),0);
       LL.points=RL.points||0;LL.sp=(RL.sp||[]).slice();LL.pmt=RL.pmt||LL.pmt;
     }else LL.packs=(LL.packs||0)+(RL.gifts||[]).filter(g=>!lg.has(g.id)).reduce((a,g)=>a+(+g.n||0),0);
     LL.totalPoints=Math.max(LL.totalPoints||0,RL.totalPoints||0);
@@ -739,16 +777,20 @@ function syncMerge(loc,rem,now){
   s.langs=s.langs.filter(L=>{
     if(seen.has(L))return true;
     const t=delTs(rdel,idsOf(L,lKey(L.name)));
-    if(t>0&&t>Math.max(+L.smt||0,+L.pmt||0)){ch.langsDel.push(L.name);ch.n++;return false;}return true;
+    if(t>0&&t>Math.max(tmax(L.smt),+L.pmt||0)){ch.langsDel.push(L.name);ch.n++;return false;}return true;
   });
-  /* Spezielle Belohnungen */
-  const rmap=x=>x.lang==='all'?x:{...x,lang:lmap[x.lang]||x.lang};
+  /* Spezielle Belohnungen: je Feld die neuere Änderung */
   (r.rewards||[]).forEach(rr=>{
-    const lr=s.rewards.find(x=>x.id===rr.id);rr=rmap(rr);
-    if(!lr){const t=delTs(s.del,[rr.id]);if(t>0&&t>=(+rr.mt||0))return;s.rewards.push(rr);add(ch,'rewards');return;}
-    if((+rr.mt||0)>(+lr.mt||0)){const a={...lr},b={...rr};delete a.mt;delete b.mt;if(sjs(a)!==sjs(b))add(ch,'rewards');Object.keys(lr).forEach(k=>delete lr[k]);Object.assign(lr,rr);}
+    if(rr.lang&&rr.lang!=='all'&&lmap[rr.lang])rr.lang=lmap[rr.lang];
+    const lr=s.rewards.find(x=>x.id===rr.id);
+    if(!lr){const t=delTs(s.del,[rr.id]);if(t>0&&t>=tmax(rr.mt))return;s.rewards.push(rr);add(ch,'rewards');return;}
+    let chg=false;
+    for(const f of new Set([...Object.keys(rFields(rr)),...Object.keys(rFields(lr))])){
+      const rt=+rr.mt[f]||0;if(rt>(+lr.mt[f]||0)){if(sjs(rr[f])!==sjs(lr[f])){if(rr[f]===undefined)delete lr[f];else lr[f]=rr[f];chg=true;}lr.mt[f]=rt;}
+    }
+    if(chg)add(ch,'rewards');
   });
-  s.rewards=s.rewards.filter(x=>{const t=delTs(rdel,[x.id]);if(t>0&&t>(+x.mt||0)){add(ch,'rewards');return false;}return true;});
+  s.rewards=s.rewards.filter(x=>{const t=delTs(rdel,[x.id]);if(t>0&&t>tmax(x.mt)){add(ch,'rewards');return false;}return true;});
   /* Serie: späterer Lerntag zählt, Rekord = größerer Wert */
   const a=s.streak||{last:null,count:0},b=r.streak||{last:null,count:0};
   if(b.last&&(!a.last||b.last>a.last||(b.last===a.last&&(b.count||0)>(a.count||0)))){a.last=b.last;a.count=b.count||0;ch.streak=true;ch.n++;}
@@ -789,14 +831,49 @@ function seed(){
   ex.forEach(([f,d])=>L.vocab.push({id:uid(),f,d,tags:['Beispiel'],box:1,due:0,seen:0,right:0,wrong:0}));
   return migrate({v:1,pinHash:null,mode:'write',rewards:[],streak:{last:null,count:0},activeLang:L.id,langs:[L]});
 }
-function load(){
-  try{const r=localStorage.getItem(KEY);if(r){const s=JSON.parse(r);if(s&&Array.isArray(s.langs))return migrate(s);}}catch(e){}
+/* Mehrere Kinder auf einem Handy: jedes Kind hat einen eigenen Zustand unter eigenem Schlüssel; das erste bleibt unter KEY */
+const PKEY=KEY+'-kinder';
+function readProfiles(){
+  try{const p=JSON.parse(localStorage.getItem(PKEY)||'null');if(p&&Array.isArray(p.list)&&p.list.some(x=>x.key===p.cur))return p;}catch(e){}
+  return {cur:KEY,list:[{key:KEY,pid:'',name:''}]};
+}
+let PROF=readProfiles();
+const writeProf=()=>{try{localStorage.setItem(PKEY,JSON.stringify(PROF));}catch(e){}};
+const kidLabel=n=>n||'Kind';
+function load(key){
+  try{const r=localStorage.getItem(key||PROF.cur);if(r){const s=JSON.parse(r);if(s&&Array.isArray(s.langs))return migrate(s);}}catch(e){}
   return seed();
 }
 let S=load();
-/* SIG: letzter gespeicherter Stand für die Zeitstempel des Abgleichs (syncStamp) */
+/* SIG: letzter gespeicherter Stand für die Zeitstempel des Abgleichs (syncStamp); Zeit möglichst vom Server, damit falsch gehende Handy-Uhren nicht stören */
 let SIG=syncSig(S);
-function save(){try{SIG=syncStamp(SIG,S,Date.now());localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Speichern nicht möglich');}}
+const stampNow=()=>{try{return tNow();}catch(e){return Date.now();}};
+function save(){
+  try{SIG=syncStamp(SIG,S,stampNow());localStorage.setItem(PROF.cur,JSON.stringify(S));}catch(e){toast('Speichern nicht möglich');}
+  const p=PROF.list.find(x=>x.key===PROF.cur);if(p&&(p.pid!==S.pid||p.name!==S.kidName)){p.pid=S.pid;p.name=S.kidName;writeProf();}
+}
+function switchProfile(key){
+  if(key===PROF.cur||!PROF.list.some(p=>p.key===key))return;
+  save();const pin=S.pinHash;PROF.cur=key;writeProf();
+  S=load(key);if(!S.pinHash)S.pinHash=pin;SIG=syncSig(S);save();
+  ui.pendingSync=null;ui.syncChoose=null;ui.unit=[];Q=null;
+}
+function addProfile(name,pid,empty){
+  const key=KEY+':'+uid();
+  const st=empty?migrate({v:1,pinHash:S.pinHash,mode:'write',rewards:[],streak:{last:null,count:0},activeLang:null,langs:[]}):seed();
+  st.pinHash=S.pinHash;st.kidName=String(name||'').slice(0,30);if(pid)st.pid=pid;else st.mt.kidName=stampNow();
+  try{localStorage.setItem(key,JSON.stringify(st));}catch(e){toast('Speichern nicht möglich');return;}
+  PROF.list.push({key,pid:st.pid,name:st.kidName});writeProf();switchProfile(key);
+}
+function imgKeysOf(st){const k=new Set();(st.langs||[]).forEach(L=>(L.cards||[]).forEach(c=>k.add(c.id)));(st.customBacks||[]).forEach(b=>k.add('back:'+b.id));return k;}
+function otherImgKeys(){const k=new Set([PACK_KEY]);PROF.list.forEach(p=>{if(p.key===PROF.cur)return;try{const st=JSON.parse(localStorage.getItem(p.key)||'null');if(st)imgKeysOf(st).forEach(x=>k.add(x));}catch(e){}});return k;}
+async function delProfile(key){
+  if(key===PROF.cur)return;
+  let st=null;try{st=JSON.parse(localStorage.getItem(key)||'null');}catch(e){}
+  PROF.list=PROF.list.filter(p=>p.key!==key);writeProf();
+  try{localStorage.removeItem(key);localStorage.removeItem(key+'-vor-abgleich');}catch(e){}
+  if(st){const keep=otherImgKeys();imgKeysOf(S).forEach(x=>keep.add(x));for(const id of imgKeysOf(st))if(!keep.has(id))await delImg(id);}
+}
 const curLang=()=>S.langs.find(l=>l.id===S.activeLang)||S.langs[0]||null;
 const unitsOf=L=>[...new Set(L.vocab.flatMap(tagsOf))].sort(new Intl.Collator('de',{sensitivity:'base',numeric:true}).compare);
 const hasTag=(w,t)=>tagsOf(w).includes(t);
@@ -870,7 +947,7 @@ function starterBlob(emoji,color){
 }
 
 /* ================= Zustand der Oberfläche ================= */
-const ui={pendingSync:null,view:'home',selMode:false,cardSel:[],setupErr:'',lockErr:'',lockPin:false,sm:'p',sg:'d',unit:[],catOpen:'',pscope:'one',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
+const ui={pendingSync:null,syncChoose:null,sharedSync:null,view:'home',selMode:false,cardSel:[],setupErr:'',lockErr:'',lockPin:false,sm:'p',sg:'d',unit:[],catOpen:'',pscope:'one',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
 let Q=null,deferredInstall=null,confirmT,rec=null;
 
 /* ================= Hilfe ================= */
@@ -917,7 +994,8 @@ const HELP={
   options:['Optionen',[
     'Farbschema: Wähle in der Liste dein Lieblingsdesign.',
     'Kartenrücken: Wische oder tippe auf ‹ ›, und tippe auf einen Rücken, um ihn zu wählen. Er gilt für das Kartenset der gewählten Sprache. Eigene Rücken fügen Mama oder Papa im Elternbereich hinzu.',
-    'Einstellungen gelten für dieses Gerät.']],
+    'Einstellungen gelten für dieses Gerät.',
+    'Abgleich mit Mama und Papa: „Abgleich-Datei senden“ schickt deinen Lernstand, z. B. per WhatsApp. Mit „Abgleich-Datei laden“ holst du neue Vokabeln und Einstellungen von Mama oder Papa. Du siehst vorher, was sich ändert, und tippst dann auf „Abgleichen“.']],
   parent:['Elternbereich',[
     'Der Bereich ist mit einer PIN geschützt. „Sperren“ schließt ihn wieder.',
     'Alle Sprachen / Einzelne Sprache: Bei „Alle Sprachen“ gelten Punkte & Abfrage für jede Sprache. Bei „Einzelne Sprache“ wählst du im Dropdown die Sprache und kannst deren Vokabeln, Karten und Belohnungen bearbeiten.',
@@ -976,6 +1054,13 @@ const HELP={
     'Abfrage beim Schreiben: Richtung der Abfrage (Fremdwort → Deutsch, Deutsch → Fremdwort oder gemischt).',
     'Spracherkennung: Sprache für den Sprechen-Modus, meist automatisch.',
     '1 Päckchen schenken: Gibt der Sprache sofort ein Päckchen.']],
+  kids:['Kinder',[
+    'Mehrere Kinder: Jedes Kind hat auf diesem Handy einen eigenen Bereich mit Sprachen, Vokabeln, Punkten, Karten und Statistik.',
+    'Name: Der Name hilft beim Zuordnen und steht in der Abgleich-Datei.',
+    'Wechseln: Wählt das Kind aus. Alles in der App (Lernen, Album, Elternbereich) gilt dann für dieses Kind.',
+    'Abgleich: Eine Datei vom Handy eines Kindes wird automatisch dem richtigen Kind zugeordnet. Beim ersten Mal fragt die App, zu welchem Kind sie gehört, oder legt ein neues an.',
+    'Löschen: Entfernt das Kind mit allen Daten auf diesem Handy. Dafür zweimal tippen.',
+    'Die PIN gilt für alle Kinder.']],
   sync:['Abgleich mit anderem Handy',[
     'Wofür: Das Kind lernt auf seinem Handy, die Eltern pflegen Vokabeln und Einstellungen auf ihrem. Mit dem Abgleich bekommen beide Handys denselben Stand, ohne Konto und ohne Internet-Dienst.',
     'Was abgeglichen wird: Sprachen, Vokabeln mit Tags, Lernstand der Wörter, Punkte, Päckchen, Statistik, Serie, „Zu schwer“-Meldungen und Pausieren, Spezielle Belohnungen (auch gewonnene und eingelöste), Serien-Belohnung, Lernpause sowie Punkte & Abfrage.',
@@ -985,8 +1070,11 @@ const HELP={
     'Zusammenführen: Nichts wird einfach überschrieben. Bei jedem Wort und jeder Einstellung gilt die neuere Änderung, neue Wörter beider Handys bleiben erhalten, gelöschte werden auf beiden gelöscht. Geschenkte Päckchen gehen nicht verloren.',
     'Danach zurückschicken: Damit beide Handys gleich sind, nach dem Abgleich vom zweiten Handy wieder eine Datei an das erste schicken und dort laden.',
     'Sicherheit: Vor jedem Abgleich wird der alte Stand automatisch gesichert. „Letzten Abgleich rückgängig machen“ stellt ihn wieder her.',
+    'Zeitpunkt: Entscheidend ist, wann eine Einstellung oder ein Wort geändert wurde, nicht wann die Datei erstellt oder geladen wird. Lädt das Kind deine Datei erst Tage später, gehen weder deine Änderungen noch sein Lernstand verloren. Die Uhrzeit kommt möglichst vom Server.',
+    'Kind: In den Optionen kann das Kind selbst senden und laden. Dort gehen nur Abgleich-Dateien für dieses Kind, keine Sicherungen, keine älteren Dateien und kein Rückgängigmachen.',
+    'Mehrere Kinder: Unter „Kinder“ legst du für jedes Kind einen Bereich an. Dateien werden dem richtigen Kind zugeordnet.',
     'Erster Start: Am einfachsten die Sicherung vom Handy des Kindes einmal auf dem Eltern-Handy laden („Sicherung & PIN“). Danach nur noch abgleichen.',
-    'Tipp: Die Uhrzeit beider Handys sollte stimmen, weil die neuere Änderung gewinnt.']],
+    'Ohne Internet gilt die Uhr des Handys. Sie sollte dann stimmen, weil die neuere Änderung gewinnt.']],
   backup:['Sicherung & PIN',[
     'App installieren: Legt die App als Symbol auf dem Startbildschirm an.',
     'Sicherung speichern: Erstellt eine Datei mit Wörtern, Karten, Bildern und Fortschritt. Bitte regelmäßig machen und sicher aufbewahren.',
@@ -1034,7 +1122,7 @@ function vHome(){
   const n=Math.min(L.sessionSize,pool);
   const pct=Math.min(100,Math.round(L.points/L.goal*100));
   const st=streakNow(),nextT=(S.streakCfg.def.active||S.streakCfg.nextRid||S.streakCfg.nextPack)?nextStreakTarget(st,S.streakCfg.days):0;
-  return `${langChips()}
+  return `${PROF.list.length>1?`<p class="note center" style="margin:0 0 6px">Profil: <b>${esc(kidLabel(S.kidName))}</b></p>`:''}${langChips()}
   <div class="panel">
     <div class="packbox">
       <div class="packimg">${packPic()}${packCount(L)>0?`<span class="badge">${packCount(L)}</span>`:''}</div>
@@ -1237,7 +1325,7 @@ function vParent(){
       <button class="btn primary block" data-a="pin-go">Entsperren</button></div>`;
   }
   const L=curLang();
-  let h=`<div class="row spread"><h2>Elternbereich</h2><span class="row" style="gap:8px">${helpBtn('parent')}<button class="btn small" data-a="lock">Sperren</button></span></div>${scopeBar()}`;
+  let h=`<div class="row spread"><h2>Elternbereich${PROF.list.length>1?` <span class="pill">${esc(kidLabel(S.kidName))}</span>`:''}</h2><span class="row" style="gap:8px">${helpBtn('parent')}<button class="btn small" data-a="lock">Sperren</button></span></div>${scopeBar()}`;
   if(L&&(L.cards.length||L.vocab.length)&&(!S.lastBackup||Date.now()-S.lastBackup>14*864e5))h+=`<div class="busy">Die letzte Sicherung ist ${S.lastBackup?'älter als 14 Tage':'noch nicht gemacht'}. Bitte unter „Sicherung &amp; PIN“ eine Sicherung speichern, damit Karten und Fortschritt nicht verloren gehen.</div>`;
   h+=secBtn('lang','Sprachen');if(ui.sec==='lang')h+=pLang();
   if(ui.pscope==='all')h+=`<p class="note">Vokabeln, Karten, Kartenrücken und Spezielle Belohnungen gehören zu einer Sprache. Wähle dafür „Einzelne Sprache“.</p>`;
@@ -1251,6 +1339,7 @@ function vParent(){
   h+=secBtn('streak','Serien-Belohnung');if(ui.sec==='streak')h+=pStreak();
   h+=secBtn('pomo','Lernpause');if(ui.sec==='pomo')h+=pPomo();
   h+=secBtn('reward','Punkte &amp; Abfrage');if(ui.sec==='reward')h+=L?pReward(L):noLang();
+  h+=secBtn('kids','Kinder');if(ui.sec==='kids')h+=pKids();
   h+=secBtn('sync','Abgleich mit anderem Handy');if(ui.sec==='sync')h+=pSync();
   h+=secBtn('backup','Sicherung &amp; PIN');if(ui.sec==='backup')h+=pBackup();
   return h;
@@ -1384,17 +1473,34 @@ function syncPreview(p){
   if(c.streak)li.push('Serie');
   return li;
 }
+function syncBox(){
+  const p=ui.pendingSync;if(!p)return '';
+  if(!p.ch.n)return `<div class="busy" style="margin-top:10px">Keine Änderungen: Dieses Handy ist schon auf dem Stand der Datei vom ${fmtDate(p.ts)}.<div class="row" style="margin-top:8px"><button class="btn small" data-a="sync-no">OK</button></div></div>`;
+  return `<div class="busy" style="margin-top:10px"><b>Abgleich mit Datei vom ${fmtDate(p.ts)}${PROF.list.length>1?` für ${esc(kidLabel(S.kidName))}`:''}:</b><ul style="margin:6px 0 0;padding-left:20px">${syncPreview(p).map(x=>`<li>${x}</li>`).join('')}</ul><p class="note">Vorher wird der aktuelle Stand automatisch gesichert.</p><div class="row" style="margin-top:8px"><button class="btn small primary" data-a="sync-yes">Abgleichen</button><button class="btn small" data-a="sync-no">Abbrechen</button></div></div>`;
+}
+const SYNC_ACCEPT='.txt,.json,text/plain,application/json,application/octet-stream';
 function pSync(){
-  const p=ui.pendingSync;let bk=null;try{bk=JSON.parse(localStorage.getItem(SYNC_BK)||'null');}catch(e){}
+  let bk=null;try{bk=JSON.parse(localStorage.getItem(syncBk())||'null');}catch(e){}
+  const c=ui.syncChoose;
   return `<div class="secbody">
-  <p class="note" style="margin-top:0">Gleicht Vokabeln, Lernstand, Punkte, Statistik, Sprachen, Belohnungen, Serie und Lernpause mit einem zweiten Handy ab. Bilder, Karten, PIN, Farbschema und Kartenrücken bleiben auf jedem Handy für sich.</p>
+  <p class="note" style="margin-top:0">Gleicht Vokabeln, Lernstand, Punkte, Statistik, Sprachen, Belohnungen, Serie und Lernpause mit einem zweiten Handy ab. Bilder, Karten, PIN, Farbschema und Kartenrücken bleiben auf jedem Handy für sich.${PROF.list.length>1?` Gilt für: <b>${esc(kidLabel(S.kidName))}</b>.`:''}</p>
   <button class="btn primary block" data-a="sync-export">Abgleich-Datei senden</button>
-  <label class="btn block" for="syncin" style="margin-top:8px">Abgleich-Datei laden</label><input id="syncin" type="file" accept=".txt,.json,text/plain,application/json,application/octet-stream" hidden data-change="sync-import">
-  ${p?`<div class="busy" style="margin-top:10px">${p.ch.n?`<b>Abgleich mit Datei vom ${fmtDate(p.ts)}:</b><ul style="margin:6px 0 0;padding-left:20px">${syncPreview(p).map(x=>`<li>${x}</li>`).join('')}</ul><p class="note">Vorher wird der aktuelle Stand automatisch gesichert.</p><div class="row" style="margin-top:8px"><button class="btn small primary" data-a="sync-yes">Abgleichen</button><button class="btn small" data-a="sync-no">Abbrechen</button></div>`:`Keine Änderungen: Dieses Handy ist schon auf dem Stand der Datei vom ${fmtDate(p.ts)}.<div class="row" style="margin-top:8px"><button class="btn small" data-a="sync-no">OK</button></div>`}</div>`:''}
-  <p class="note">Ablauf: Auf Handy A „Abgleich-Datei senden“ (z. B. per WhatsApp), auf Handy B die Datei laden und „Abgleichen“. Danach von Handy B eine Datei zurückschicken, damit beide gleich sind.</p>
+  <label class="btn block" for="syncin" style="margin-top:8px">Abgleich-Datei laden</label><input id="syncin" type="file" accept="${SYNC_ACCEPT}" hidden data-change="sync-import">
+  ${ui.sharedSync?`<div class="busy" style="margin-top:10px">Eine geteilte Abgleich-Datei wartet.<div class="row" style="margin-top:8px"><button class="btn small primary" data-a="sync-shared">Jetzt laden</button><button class="btn small" data-a="sync-no">Verwerfen</button></div></div>`:''}
+  ${c?`<div class="busy" style="margin-top:10px">Die Datei ist von <b>${esc(c.name||'einem Kind')}</b>. Zu welchem Kind gehört sie?<div class="row" style="margin-top:8px;flex-wrap:wrap">${PROF.list.map(p=>`<button class="btn small" data-a="sync-pick" data-k="${esc(p.key)}">${esc(kidLabel(p.key===PROF.cur?S.kidName:p.name))}</button>`).join('')}<button class="btn small primary" data-a="sync-new">Neues Kind anlegen</button><button class="btn small" data-a="sync-no">Abbrechen</button></div></div>`:''}
+  ${syncBox()}
+  <p class="note">Ablauf: Auf Handy A „Abgleich-Datei senden“ (z. B. per WhatsApp), auf Handy B die Datei laden und „Abgleichen“. Danach von Handy B eine Datei zurückschicken, damit beide gleich sind. Das Kind kann das auch selbst in den Optionen.</p>
   <p class="note">Letzter Abgleich: <b>${S.lastSync?fmtDate(S.lastSync):'noch nie'}</b></p>
   ${bk?`<div>${confBtn('sync-undo:x','Letzten Abgleich rückgängig machen','block')}</div><p class="note">Stellt den Stand vor dem Abgleich vom ${fmtDate(bk.ts)} wieder her.</p>`:''}
   </div>`;
+}
+function pKids(){
+  const many=PROF.list.length>1;
+  return `<div class="secbody">
+  <div class="field"><label for="kidname">Name ${many?'des ausgewählten Kindes':'des Kindes'}</label><input id="kidname" class="in" maxlength="30" value="${esc(S.kidName)}" placeholder="z. B. Mia" data-change="kidname"></div>
+  ${many?PROF.list.map(p=>{const on=p.key===PROF.cur;return `<div class="urow"><div class="t"><b>${esc(kidLabel(on?S.kidName:p.name))}</b>${on?'<div class="note">ausgewählt</div>':''}</div>${on?'':`<button class="btn small" data-a="kid-switch" data-k="${esc(p.key)}">Wechseln</button>${confBtn('kid-del:'+p.key,'Löschen','')}`}</div>`;}).join(''):''}
+  <div class="field" style="margin-top:12px"><label for="newkid">Weiteres Kind anlegen</label><div class="row"><input id="newkid" class="in grow" maxlength="30" placeholder="Name"><button class="btn primary" data-a="kid-add">Anlegen</button></div></div>
+  <p class="note">Jedes Kind hat eigene Sprachen, Vokabeln, Punkte, Karten und Statistik. Abgleich-Dateien werden dem richtigen Kind zugeordnet. Die PIN gilt für das ganze Handy.</p></div>`;
 }
 function pBackup(){
   return `<div class="secbody">
@@ -1534,7 +1640,12 @@ function vOptions(){
   <div class="carousel grow" id="carousel">${backIds().map(id=>{const on=backOf(curLang())===id,cb=S.customBacks.find(b=>b.id===id),nm=cb?cb.name:BACKS[id-1];return `<button class="bk ${on?'on':''}" data-a="back" data-n="${id}" aria-pressed="${on}"><img src="${backSrc(id)}" alt="" ${cb?'':'loading="lazy"'}><span>${on?'✓ ':''}${esc(nm)}</span></button>`;}).join('')}</div>
   <button class="icon-btn" data-a="back-step" data-d="1" aria-label="Weiter">›</button></div>
   <p class="note center">Wische oder tippe auf ‹ ›. So sehen die Karten im Päckchen aus, bevor sie aufgedeckt werden. Eigene Rücken fügen Mama oder Papa im Elternbereich hinzu.</p>
-  ${S.langs.length>1?`<button class="btn small block" data-a="back-all">Für alle Sprachen übernehmen</button>`:''}</div>`;
+  ${S.langs.length>1?`<button class="btn small block" data-a="back-all">Für alle Sprachen übernehmen</button>`:''}</div>
+  <div class="panel"><h3>Abgleich mit Mama und Papa</h3>
+  <p class="note" style="margin-top:0">Schick deinen Lernstand an Mama oder Papa. Ihre Datei bringt neue Vokabeln und Einstellungen auf dein Handy.</p>
+  <button class="btn primary block" data-a="sync-export">Abgleich-Datei senden</button>
+  <label class="btn block" for="syncin-k" style="margin-top:8px">Abgleich-Datei laden</label><input id="syncin-k" type="file" accept="${SYNC_ACCEPT}" hidden data-change="sync-import-kid">
+  ${syncBox()}</div>`;
 }
 function confetti(n){try{
   if(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches)return;
@@ -1693,7 +1804,8 @@ function openPack(){
 const blobToDataURL=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(b);});
 async function exportBackup(){
   try{
-    const images={};for(const id of Object.keys(BLOBS))images[id]=await blobToDataURL(BLOBS[id]);
+    const mine=imgKeysOf(S);mine.add(PACK_KEY);
+    const images={};for(const id of Object.keys(BLOBS))if(PROF.list.length<2||mine.has(id))images[id]=await blobToDataURL(BLOBS[id]);
     const blob=new Blob([JSON.stringify({app:'woerter-sammler',v:1,state:S,images})],{type:'application/json'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='woerter-sammler-sicherung-'+dateKey(0)+'.json';
     document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
@@ -1703,8 +1815,10 @@ async function exportBackup(){
 async function applyImport(){
   const d=ui.pendingImport;ui.pendingImport=null;if(!d)return;
   try{
-    try{await idbClear();}catch(e){}
-    Object.keys(IMG).forEach(k=>{URL.revokeObjectURL(IMG[k]);delete IMG[k];delete BLOBS[k];});
+    if(PROF.list.length<2){
+      try{await idbClear();}catch(e){}
+      Object.keys(IMG).forEach(k=>{URL.revokeObjectURL(IMG[k]);delete IMG[k];delete BLOBS[k];});
+    }else{const keep=otherImgKeys();for(const k of Object.keys(BLOBS))if(!keep.has(k))await delImg(k);}
     for(const id of Object.keys(d.images||{})){const b=await (await fetch(d.images[id])).blob();await putImg(id,b);}
     const dev=S.dev;S=migrate(d.state);S.dev=dev;SIG=syncSig(S);save();ui.unlocked=true;toast('Sicherung geladen');
   }catch(e){toast('Laden fehlgeschlagen');}
@@ -1712,10 +1826,10 @@ async function applyImport(){
 }
 
 /* ================= Abgleich (Sync-Datei) ================= */
-const SYNC_BK=KEY+'-vor-abgleich';
+const syncBk=()=>PROF.cur+'-vor-abgleich';
 async function syncExport(){
-  const now=Date.now(),txt=JSON.stringify(syncPayload(S,now));
-  const name='woerter-sammler-abgleich-'+dateKey(0)+'.txt';
+  const now=stampNow(),txt=JSON.stringify(syncPayload(S,now));
+  const name='woerter-sammler-abgleich-'+(S.kidName?S.kidName.replace(/[^\wäöüÄÖÜß-]+/g,'_')+'-':'')+dateKey(0)+'.txt';
   try{
     const f=typeof File==='function'?new File([txt],name,{type:'text/plain'}):null;
     if(f&&navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Wörter-Sammler Abgleich'});toast('Abgleich-Datei geteilt');return;}
@@ -1723,25 +1837,48 @@ async function syncExport(){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'}));a.download=name;
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('Abgleich-Datei gespeichert');
 }
-function readSync(text){
-  let d;try{d=JSON.parse(text);}catch(e){return 'Das ist keine Abgleich-Datei.';}
-  if(!d||d.app!=='woerter-sammler'||!d.state||!Array.isArray(d.state.langs))return 'Das ist keine Abgleich-Datei.';
-  if(d.kind!=='sync')d=syncPayload(migrate(d.state),d.ts||0);
-  if(d.dev&&d.dev===S.dev)return 'Diese Datei kommt von diesem Handy. Bitte die Datei vom anderen Handy laden.';
-  save();
-  const m=syncMerge(S,d.state,Date.now());
-  ui.pendingSync={ts:d.ts||Date.now(),state:m.state,ch:m.ch};return '';
+/* kid: Abgleich aus den Optionen ohne PIN – nur Abgleich-Dateien für dieses Kind, keine älteren Stände, keine Sicherungen */
+function parseSync(text,kid){
+  const bad={err:'Das ist keine Abgleich-Datei.'};
+  let d;try{d=JSON.parse(text);}catch(e){return bad;}
+  if(!d||d.app!=='woerter-sammler'||!d.state||!Array.isArray(d.state.langs))return bad;
+  if(d.kind!=='sync'){if(kid)return {err:'Das ist eine Sicherung. Sicherungen können nur Mama oder Papa im Elternbereich laden.'};d=syncPayload(migrate(d.state),d.ts||0);d.backup=true;}
+  if(d.dev&&d.dev===S.dev)return {err:'Diese Datei kommt von diesem Handy. Bitte die Datei vom anderen Handy laden.'};
+  return {d};
 }
-function openSync(text){const err=readSync(text);if(err){toast(err);return;}ui.view='parent';ui.sec='sync';render();}
+const syncProfiles=()=>PROF.list.map(p=>p.key===PROF.cur?{...p,pid:S.pid,name:S.kidName}:p);
+function readSync(text,kid){
+  const r=parseSync(text,kid);if(r.err)return r.err;
+  const t=syncTarget(r.d,syncProfiles(),PROF.cur,!!S.lastSync,kid);
+  if(t.err)return t.err;
+  if(t.choose){ui.syncChoose=r.d;ui.pendingSync=null;return '';}
+  return prepSync(r.d,t.key,t.adopt,kid);
+}
+function prepSync(d,key,adopt,kid){
+  if(key!==PROF.cur)switchProfile(key);
+  if(kid&&d.dev&&(+S.syncSeen[d.dev]||0)>(+d.ts||0))return 'Diese Datei ist älter als die zuletzt geladene. Bitte die neueste Datei nehmen.';
+  save();
+  const m=syncMerge(S,d.state,stampNow());
+  ui.syncChoose=null;ui.pendingSync={ts:d.ts||Date.now(),dev:d.dev||'',pid:adopt?d.pid:'',name:d.name||'',state:m.state,ch:m.ch};return '';
+}
+/* über „Teilen“ geöffnet: Abgleich-Datei für dieses Kind → Optionen (ohne PIN), sonst Elternbereich */
+function openSync(text){
+  const r=parseSync(text,false);if(r.err){toast(r.err);return;}
+  const t=r.d.backup?{err:'x'}:syncTarget(r.d,syncProfiles(),PROF.cur,!!S.lastSync,true);
+  if(!t.err){const err=readSync(text,true);if(err)toast(err);ui.view='options';render();return;}
+  ui.sharedSync=text;ui.view='parent';ui.sec='sync';render();
+}
 function applySync(){
   const p=ui.pendingSync;ui.pendingSync=null;if(!p)return;
-  try{localStorage.setItem(SYNC_BK,JSON.stringify({ts:Date.now(),state:S}));}catch(e){toast('Sicherung vor dem Abgleich nicht möglich');render();return;}
-  S=migrate(p.state);S.lastSync=Date.now();SIG=syncSig(S);save();toast('Abgleich fertig');render();
+  try{localStorage.setItem(syncBk(),JSON.stringify({ts:Date.now(),state:S}));}catch(e){toast('Sicherung vor dem Abgleich nicht möglich');render();return;}
+  S=migrate(p.state);if(p.pid)S.pid=p.pid;if(!S.kidName&&p.name)S.kidName=p.name;
+  if(p.dev)S.syncSeen[p.dev]=Math.max(+S.syncSeen[p.dev]||0,+p.ts||0);
+  S.lastSync=Date.now();SIG=syncSig(S);save();toast('Abgleich fertig');render();
 }
 function undoSync(){
-  let bk=null;try{bk=JSON.parse(localStorage.getItem(SYNC_BK)||'null');}catch(e){}
+  let bk=null;try{bk=JSON.parse(localStorage.getItem(syncBk())||'null');}catch(e){}
   if(!bk||!bk.state)return;
-  S=migrate(bk.state);SIG=syncSig(S);save();try{localStorage.removeItem(SYNC_BK);}catch(e){}
+  S=migrate(bk.state);SIG=syncSig(S);save();try{localStorage.removeItem(syncBk());}catch(e){}
   toast('Stand vor dem Abgleich wiederhergestellt');render();
 }
 
@@ -1897,7 +2034,9 @@ document.addEventListener('click',async e=>{
     case 'pin-change':{
       const a=val('#pn1');
       if(!/^\d{4,8}$/.test(a)){toast('Die PIN braucht 4 bis 8 Ziffern.');break;}
-      S.pinHash=hashPin(a);save();$('#pn1').value='';toast('PIN geändert');break;}
+      S.pinHash=hashPin(a);save();$('#pn1').value='';
+      PROF.list.forEach(p=>{if(p.key===PROF.cur)return;try{const st=JSON.parse(localStorage.getItem(p.key)||'null');if(st){st.pinHash=S.pinHash;localStorage.setItem(p.key,JSON.stringify(st));}}catch(e){}});
+      toast('PIN geändert');break;}
     case 'lock':ui.unlocked=false;render();break;
     case 'sec':ui.sec=ui.sec===d.k?'':d.k;render();break;
     case 'add-lang':{
@@ -1980,7 +2119,13 @@ document.addEventListener('click',async e=>{
     case 'gift':if(L){L.packs++;L.gifts.push({id:uid(),ts:Date.now(),n:1});save();toast('1 Päckchen geschenkt');}break;
     case 'sync-export':syncExport();break;
     case 'sync-yes':applySync();break;
-    case 'sync-no':ui.pendingSync=null;render();break;
+    case 'sync-no':ui.pendingSync=null;ui.syncChoose=null;ui.sharedSync=null;render();break;
+    case 'sync-shared':{const t=ui.sharedSync;ui.sharedSync=null;const err=t?readSync(t,false):'';if(err)toast(err);render();break;}
+    case 'sync-pick':{const c=ui.syncChoose;if(!c)break;const err=prepSync(c,d.k,true,false);if(err)toast(err);render();break;}
+    case 'sync-new':{const c=ui.syncChoose;if(!c)break;addProfile(c.name||'',c.pid,true);const err=prepSync(c,PROF.cur,false,false);if(err)toast(err);render();toast('Neues Kind angelegt');break;}
+    case 'kid-switch':switchProfile(d.k);render();toast('Ausgewählt: '+kidLabel(S.kidName));break;
+    case 'kid-add':{const n=val('#newkid');if(!n){toast('Bitte einen Namen eingeben.');break;}addProfile(n);ui.sec='kids';render();toast(n+' angelegt');break;}
+    case 'kid-del':{if(!ask(d.key))break;await delProfile(d.key.slice('kid-del:'.length));render();toast('Kind gelöscht');break;}
     case 'sync-undo':{if(!ask(d.key))break;undoSync();break;}
     case 'export':exportBackup();break;
     case 'import-yes':applyImport();break;
@@ -2025,9 +2170,11 @@ document.addEventListener('change',async e=>{
     else if(key==='speechLang')T.speechLang=el.value;
     while(T.points>=T.goal){T.points-=T.goal;T.packs++;}}
     save();render();toast('Gespeichert');
-  }else if(k==='sync-import'){
+  }else if(k==='sync-import'||k==='sync-import-kid'){
     const f=el.files[0];el.value='';if(!f)return;
-    const err=readSync(await f.text());if(err)toast(err);render();
+    const err=readSync(await f.text(),k==='sync-import-kid');if(err)toast(err);render();
+  }else if(k==='kidname'){
+    S.kidName=el.value.trim().slice(0,30);save();render();
   }else if(k==='import'){
     const f=el.files[0];el.value='';if(!f)return;
     try{
