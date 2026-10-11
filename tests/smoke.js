@@ -203,7 +203,11 @@ const test=`
   // Hilfe in jedem Bereich
   for(const v of ['home','list','album','stats','options']){await click({a:'nav',v});await click({a:'help',k:v});assert(ui.modal&&ui.modal.t==='help'&&app().includes('helplist'),'Hilfe '+v);await click({a:'close-modal'});assert(!ui.modal);}
   for(const k of Object.keys(HELP)){await click({a:'help',k});assert(app().includes(esc(HELP[k][0])),'Hilfetext '+k);await click({a:'close-modal'});}
-  ui.view='parent';ui.unlocked=true;for(const k of ['lang','vocab','cards','prizes','backs','streak','pomo','reward','backup']){ui.sec=k;render();assert(app().includes('data-k="'+k+'"'),'Sektionshilfe '+k);}
+  ui.view='parent';ui.unlocked=true;ui.pscope='one';for(const k of ['lang','vocab','hard','cards','prizes','backs','streak','pomo','reward','kids','sync','backup']){ui.sec=k;render();assert(app().includes('id="sec-'+k+'"')&&app().includes('data-k="page:'+pageOf(k)+'"')&&app().includes('data-a="pscope"')===(pageOf(k)!=='settings'),'Seite mit Abschnitt, Hilfe und Sprachauswahl (nicht bei Einstellungen): '+k);}
+  for(const [p,t,ks] of PPAGES){ui.sec='';await click({a:'ppage',p});assert.equal(ui.ppage,p);ks.forEach(k=>assert(app().includes('id="sec-'+k+'"'),p+' zeigt '+k));
+    ui.modal={t:'help',k:'page:'+p};assert(vModal().includes(t)&&ks.every(k=>vModal().includes(esc(HELP[k][0]))),'Seitenhilfe '+p);ui.modal=null;}
+  assert(!app().includes('sechead'),'keine aufklappbaren Abschnitte');
+  ui.pscope='all';await click({a:'ppage',p:'cards'});assert(app().includes('Einzelne Sprache')&&!app().includes('id="sec-cards"'));ui.pscope='one';
   ui.unlocked=false;ui.view='home';render();
   // Geltungsbereich Elternbereich
   ui.view='parent';ui.unlocked=true;ui.sec='reward';render();assert(app().includes('data-a="pscope"')&&app().includes('catdrop'),'Dropdown bei Einzelsprache');

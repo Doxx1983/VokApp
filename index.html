@@ -61,6 +61,12 @@ button:focus-visible,.in:focus-visible,.chip:focus-visible{outline:3px solid var
 .chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
 .seg3{grid-template-columns:1fr 1fr 1fr}
+.ptabs{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:10px 0 6px;border-bottom:2px solid var(--line)}
+.ptabs button{appearance:none;border:0;background:none;color:var(--muted);font:inherit;font-weight:800;font-size:12.5px;padding:6px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;min-height:56px}
+.ptabs button .pi{font-size:22px;line-height:1}
+.ptabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+.psec{background:var(--surface);border-radius:16px;box-shadow:var(--shadow);margin-top:14px;padding:14px 16px 4px;scroll-margin-top:12px}.psec>h3{margin:0 0 6px;font-size:19px}
+.psec .secbody{background:none;box-shadow:none;padding:0 0 12px;margin:0;border-radius:0}
 .startbar{position:fixed;left:0;right:0;bottom:calc(68px + env(safe-area-inset-bottom));z-index:4;padding:18px max(16px,calc((100vw - 528px)/2)) 6px;background:linear-gradient(transparent,var(--bg) 40%)}
 .btn.streakon{box-shadow:0 0 0 4px var(--streak),0 0 18px 3px var(--streak)}
 .stat.streakon{box-shadow:0 0 0 3px var(--streak),0 0 14px 2px var(--streak)}
@@ -948,7 +954,7 @@ function starterBlob(emoji,color){
 }
 
 /* ================= Zustand der Oberfläche ================= */
-const ui={pendingSync:null,syncChoose:null,sharedSync:null,view:'home',selMode:false,cardSel:[],setupErr:'',lockErr:'',lockPin:false,sm:'p',sg:'d',unit:[],catOpen:'',pscope:'one',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
+const ui={ppage:'words',secShown:'',pendingSync:null,syncChoose:null,sharedSync:null,view:'home',selMode:false,cardSel:[],setupErr:'',lockErr:'',lockPin:false,sm:'p',sg:'d',unit:[],catOpen:'',pscope:'one',unlocked:false,sec:'vocab',vtext:'',vunit:'',openUnit:'',imprar:'n',modal:null,confirm:null,busy:'',pack:null,pendingImport:null,pinErr:'',lf:[],ls:{col:'f',dir:1},cats:false};
 let Q=null,deferredInstall=null,confirmT,rec=null;
 
 /* ================= Hilfe ================= */
@@ -1001,9 +1007,10 @@ const HELP={
     'Der Bereich ist mit einer PIN geschützt. „Sperren“ schließt ihn wieder.',
     'Kind wechseln: Tippe oben auf den Namen neben „Elternbereich“ und wähle das Kind. Dort kannst du auch ein weiteres Kind anlegen.',
     'Alle Sprachen / Einzelne Sprache: Bei „Alle Sprachen“ gelten Punkte & Abfrage für jede Sprache. Bei „Einzelne Sprache“ wählst du im Dropdown die Sprache und kannst deren Vokabeln, Karten und Belohnungen bearbeiten.',
-    'Tippe auf einen Abschnitt, um ihn zu öffnen. Bei jedem Abschnitt gibt es eine eigene Hilfe.',
+    'Seiten: Oben wechselst du zwischen Wörter (Sprachen, Vokabeln, zu schwere Wörter), Karten (Karten, Kartenrücken), Belohnungen (Spezielle Belohnungen, Serie, Punkte & Abfrage, Lernpause) und Einstellungen (Kinder, Abgleich, Sicherung & PIN).',
+    'Hilfe: „? Hilfe“ erklärt alles auf der aktuellen Seite.',
     'Zwei Handys: Unter „Abgleich mit anderem Handy“ gleichst du Vokabeln, Lernstand und Einstellungen per Datei ab.',
-    'Einmal im Monat sollte unter „Sicherung & PIN“ eine Sicherung gespeichert werden.']],
+    'Einmal im Monat sollte unter Einstellungen → „Sicherung & PIN“ eine Sicherung gespeichert werden.']],
   lang:['Sprachen',[
     'Lege hier Sprachen an, z. B. „Französisch“.',
     'Jede Sprache hat eigene Vokabeln, Punkte, Karten und Statistik.',
@@ -1085,6 +1092,13 @@ const HELP={
 };
 function helpBtn(k){return `<button class="btn small helpb" data-a="help" data-k="${k}" aria-label="Hilfe">? Hilfe</button>`;}
 function helpModal(k){
+  if(k.startsWith('page:')){
+    const p=PPAGES.find(x=>x[0]===k.slice(5))||PPAGES[0],li=t=>{const i=t.indexOf(': ');return `<li>${i>0&&i<28?`<b>${esc(t.slice(0,i))}</b>: ${esc(t.slice(i+2))}`:esc(t)}</li>`;};
+    return `<div class="modal" data-a="backdrop"><div class="mbox"><h3>Hilfe · ${esc(p[1])}</h3>
+    ${p[2].map(s=>HELP[s]?`<h4 style="margin:14px 0 4px">${esc(HELP[s][0])}</h4><ul class="helplist">${HELP[s][1].map(li).join('')}</ul>`:'').join('')}
+    <h4 style="margin:14px 0 4px">Elternbereich allgemein</h4><ul class="helplist">${HELP.parent[1].map(li).join('')}</ul>
+    <button class="btn primary block" data-a="close-modal">Schließen</button></div></div>`;
+  }
   const e=HELP[k]||HELP.home;
   return `<div class="modal" data-a="backdrop"><div class="mbox"><h3>${esc(e[0])}</h3><ul class="helplist">${e[1].map(t=>{const i=t.indexOf(': ');return `<li>${i>0&&i<28?`<b>${esc(t.slice(0,i))}</b>: ${esc(t.slice(i+2))}`:esc(t)}</li>`;}).join('')}</ul>
   <button class="btn primary block" data-a="close-modal">Schließen</button></div></div>`;
@@ -1310,10 +1324,12 @@ function pBacks(L){
   <label class="btn small block" for="backin">Eigenen Kartenrücken hinzufügen</label><input id="backin" type="file" accept="image/*" hidden data-change="backimg">
   ${S.customBacks.length?`<div class="grid" style="margin-top:12px">${S.customBacks.map(b=>`<div style="text-align:center"><img src="${backSrc(b.id)}" alt="" style="width:100%;aspect-ratio:360/504;object-fit:cover;border-radius:12px;display:block"><div class="note" style="margin:4px 0">${esc(b.name)}</div>${confBtn('del-back:'+b.id,'Löschen','block')}</div>`).join('')}</div>`:'<p class="note">Noch keine eigenen Kartenrücken.</p>'}`;
 }
-function secBtn(k,t){return `<button class="sechead ${ui.sec===k?'on':''}" data-a="sec" data-k="${k}"><span class="grow">${t}</span><span class="hq" data-a="help" data-k="${k}" role="button" aria-label="Hilfe">?</span><span>${ui.sec===k?'−':'+'}</span></button>`;}
 function confBtn(key,label,cls,attrs){const on=ui.confirm===key;return `<button class="btn small ${on?'danger':cls||''}" ${attrs||''} data-a="${key.split(':')[0]}" data-key="${esc(key)}">${on?'Wirklich?':label}</button>`;}
 const rarOptions=sel=>RARITIES.map(r=>`<option value="${r.k}" ${sel===r.k?'selected':''}>${r.label}</option>`).join('');
 
+/* Elternbereich: vier Seiten mit festen Abschnitten (statt aufklappbarer Abschnitte) */
+const PPAGES=[['words','Wörter',['lang','vocab','hard'],'📚'],['cards','Karten',['cards','backs'],'🃏'],['rewards','Belohnungen',['prizes','streak','reward','pomo'],'🎁'],['settings','Einstellungen',['kids','sync','backup'],'⚙️']];
+const pageOf=k=>{const p=PPAGES.find(x=>x[2].includes(k));return p?p[0]:'';};
 function vParent(){
   if(!ui.unlocked){
     if(!S.pinHash) return `<div class="panel"><h2>PIN festlegen</h2><p class="muted">Der Elternbereich ist mit einer PIN geschützt, damit nur ihr daran ändern könnt.</p>
@@ -1327,25 +1343,27 @@ function vParent(){
       <button class="btn primary block" data-a="pin-go">Entsperren</button></div>`;
   }
   const L=curLang();
-  let h=`<div class="row spread"><h2>Elternbereich <button class="pill kidpill" data-a="kid-menu" aria-expanded="${!!ui.kidMenu}" aria-label="Kind wechseln">${esc(kidLabel(S.kidName))} ${ui.kidMenu?'▲':'▼'}</button></h2><span class="row" style="gap:8px">${helpBtn('parent')}<button class="btn small" data-a="lock">Sperren</button></span></div>`;
+  if(ui.sec&&pageOf(ui.sec))ui.ppage=pageOf(ui.sec);
+  const pg=PPAGES.some(x=>x[0]===ui.ppage)?ui.ppage:'words';ui.ppage=pg;
+  let h=`<div class="row spread"><h2>Elternbereich <button class="pill kidpill" data-a="kid-menu" aria-expanded="${!!ui.kidMenu}" aria-label="Kind wechseln">${esc(kidLabel(S.kidName))} ${ui.kidMenu?'▲':'▼'}</button></h2><span class="row" style="gap:8px">${helpBtn('page:'+pg)}<button class="btn small" data-a="lock">Sperren</button></span></div>`;
   if(ui.kidMenu)h+=`<div class="themelist kidmenu">${PROF.list.map(p=>{const on=p.key===PROF.cur;return `<button class="theme ${on?'on':''}" data-a="kid-switch" data-k="${esc(p.key)}">${on?'✓ ':''}${esc(kidLabel(on?S.kidName:p.name))}</button>`;}).join('')}<button class="theme" data-a="kid-new">+ Weiteres Kind anlegen</button></div>`;
-  h+=scopeBar();
-  if(L&&(L.cards.length||L.vocab.length)&&(!S.lastBackup||Date.now()-S.lastBackup>14*864e5))h+=`<div class="busy">Die letzte Sicherung ist ${S.lastBackup?'älter als 14 Tage':'noch nicht gemacht'}. Bitte unter „Sicherung &amp; PIN“ eine Sicherung speichern, damit Karten und Fortschritt nicht verloren gehen.</div>`;
-  h+=secBtn('lang','Sprachen');if(ui.sec==='lang')h+=pLang();
-  if(ui.pscope==='all')h+=`<p class="note">Vokabeln, Karten, Kartenrücken und Spezielle Belohnungen gehören zu einer Sprache. Wähle dafür „Einzelne Sprache“.</p>`;
-  else{
-  h+=secBtn('vocab','Vokabeln');if(ui.sec==='vocab')h+=L?pVocab(L):noLang();
-  {const nh=L?L.vocab.filter(w=>w.hard).length:0;h+=secBtn('hard','Zu schwere Wörter'+(nh?` <span class="pill">${nh} neu</span>`:''));if(ui.sec==='hard')h+=L?pHard(L):noLang();}
-  h+=secBtn('cards','Karten');if(ui.sec==='cards')h+=L?pCards(L):noLang();
-  h+=secBtn('prizes','Spezielle Belohnungen');if(ui.sec==='prizes')h+=L?pPrizes(L):noLang();
-  h+=secBtn('backs','Kartenrücken');if(ui.sec==='backs')h+=L?pBacks(L):noLang();
+  h+=`<div class="ptabs" role="tablist" aria-label="Seiten">${PPAGES.map(([k,t,,ic])=>`<button role="tab" aria-selected="${pg===k}" class="${pg===k?'on':''}" data-a="ppage" data-p="${k}"><span class="pi" aria-hidden="true">${ic}</span>${t}</button>`).join('')}</div>`;
+  if(pg!=='settings')h+=scopeBar();
+  if(L&&(L.cards.length||L.vocab.length)&&(!S.lastBackup||Date.now()-S.lastBackup>14*864e5))h+=`<div class="busy">Die letzte Sicherung ist ${S.lastBackup?'älter als 14 Tage':'noch nicht gemacht'}. Bitte eine Sicherung speichern, damit Karten und Fortschritt nicht verloren gehen.${pg==='settings'?'':`<div style="margin-top:8px"><button class="btn small" data-a="ppage" data-p="settings" data-s="backup">Zur Sicherung</button></div>`}</div>`;
+  const one=ui.pscope!=='all',needOne=t=>`<section class="psec"><h3>${t}</h3><p class="note" style="margin:0 0 10px">Gehört zu einer Sprache. Wähle oben „Einzelne Sprache“.</p></section>`;
+  const sec=(k,t,body)=>`<section class="psec" id="sec-${k}"><h3>${t}</h3>${body}</section>`;
+  const nh=L?L.vocab.filter(w=>w.hard).length:0;
+  if(pg==='words'){
+    h+=sec('lang','Sprachen',pLang());
+    h+=one?sec('vocab','Vokabeln',L?pVocab(L):noLang())+sec('hard','Zu schwere Wörter'+(nh?` <span class="pill">${nh} neu</span>`:''),L?pHard(L):noLang()):needOne('Vokabeln &amp; zu schwere Wörter');
+  }else if(pg==='cards'){
+    h+=one?sec('cards','Karten',L?pCards(L):noLang())+sec('backs','Kartenrücken',L?pBacks(L):noLang()):needOne('Karten &amp; Kartenrücken');
+  }else if(pg==='rewards'){
+    h+=one?sec('prizes','Spezielle Belohnungen',L?pPrizes(L):noLang()):needOne('Spezielle Belohnungen');
+    h+=sec('streak','Serien-Belohnung',pStreak())+sec('reward','Punkte &amp; Abfrage',L?pReward(L):noLang())+sec('pomo','Lernpause',pPomo());
+  }else{
+    h+=sec('kids','Kinder',pKids())+sec('sync','Abgleich mit anderem Handy',pSync())+sec('backup','Sicherung &amp; PIN',pBackup());
   }
-  h+=secBtn('streak','Serien-Belohnung');if(ui.sec==='streak')h+=pStreak();
-  h+=secBtn('pomo','Lernpause');if(ui.sec==='pomo')h+=pPomo();
-  h+=secBtn('reward','Punkte &amp; Abfrage');if(ui.sec==='reward')h+=L?pReward(L):noLang();
-  h+=secBtn('kids','Kinder');if(ui.sec==='kids')h+=pKids();
-  h+=secBtn('sync','Abgleich mit anderem Handy');if(ui.sec==='sync')h+=pSync();
-  h+=secBtn('backup','Sicherung &amp; PIN');if(ui.sec==='backup')h+=pBackup();
   return h;
 }
 const sh=k=>`<div class="helprow in">${helpBtn(k)}</div>`;
@@ -1568,7 +1586,7 @@ let lastView=null;
 const THEME_PROPS=['--streak','--accent-text','--bg','--surface','--surface-2','--ink','--muted','--line','--accent','--accent-2','--accent-dark','--accent-ink','--accent-soft','--good','--good-bg','--bad','--bad-bg','--warn','--warn-bg','--shadow','color-scheme'];
 const POMO_HB='ws-pomo-hb';
 let popping=false;
-function pushHist(){try{history.pushState({v:ui.view},'');}catch(e){}}
+function pushHist(){try{history.pushState(ui.view==='parent'?{v:ui.view,p:ui.ppage}:{v:ui.view},'');}catch(e){}}
 function renderLock(){
   const el=$('#lock'),p=S.pomo,setup=!S.pinHash,on=setup||!!(p&&p.lock),app=$('#app'),nav=document.querySelector('nav');
   if(app)app.inert=on;if(nav)nav.inert=on;
@@ -1664,10 +1682,10 @@ function confetti(n){try{
 }catch(_){}}
 /* Neuladen bleibt auf dem Bildschirm (auch im entsperrten Elternbereich); gilt nur für diesen Tab (sessionStorage) */
 const NAV_KEY='woerter-sammler-ansicht',NAV_VIEWS={home:1,list:1,album:1,stats:1,options:1,parent:1};
-function saveNav(){try{sessionStorage.setItem(NAV_KEY,JSON.stringify({v:NAV_VIEWS[ui.view]?ui.view:'home',u:ui.view==='parent'&&ui.unlocked,sec:ui.sec,ps:ui.pscope,y:window.scrollY||0}));}catch(e){}}
+function saveNav(){try{sessionStorage.setItem(NAV_KEY,JSON.stringify({v:NAV_VIEWS[ui.view]?ui.view:'home',u:ui.view==='parent'&&ui.unlocked,sec:ui.sec,pp:ui.ppage,ps:ui.pscope,y:window.scrollY||0}));}catch(e){}}
 function restoreNav(){
   try{const n=JSON.parse(sessionStorage.getItem(NAV_KEY)||'null');if(!n||!NAV_VIEWS[n.v])return 0;
-    ui.view=n.v;ui.unlocked=!!(n.u&&n.v==='parent'&&S.pinHash);if(typeof n.sec==='string')ui.sec=n.sec;if(n.ps==='all'||n.ps==='one')ui.pscope=n.ps;return +n.y||0;}catch(e){return 0;}
+    ui.view=n.v;ui.unlocked=!!(n.u&&n.v==='parent'&&S.pinHash);if(typeof n.sec==='string')ui.sec=n.sec;if(typeof n.pp==='string')ui.ppage=n.pp;ui.secShown=ui.sec;if(n.ps==='all'||n.ps==='one')ui.pscope=n.ps;return +n.y||0;}catch(e){return 0;}
 }
 function render(){
   if(ui.view!=='parent')ui.unlocked=false;
@@ -1694,6 +1712,8 @@ function render(){
   if(ui.view==='options'){const b=document.querySelector('.bk.on');if(b&&b.scrollIntoView)b.scrollIntoView({inline:'center',block:'nearest'});}
   if(lastView==='quiz'&&ui.view!=='quiz'&&S.pomo&&!S.pomo.lock){S.pomo=pomoOnEnd(S.pomo,Date.now());save();}
   if(lastView!==ui.view){window.scrollTo(0,0);if(lastView!==null&&!popping)pushHist();lastView=ui.view;}
+  if(ui.view==='parent'&&ui.sec&&ui.sec!==ui.secShown){const el=document.getElementById?document.getElementById('sec-'+ui.sec):null;if(el&&el.scrollIntoView)el.scrollIntoView({block:'start'});}
+  ui.secShown=ui.view==='parent'?ui.sec:'';
   saveNav();
   if(ui.view==='quiz'){
     if(Q.phase==='ask'){const a=$('#ans');if(a)a.focus();}else if(Q.phase==='fb'){const b=$('#nextbtn');if(b)b.focus();}
@@ -2051,7 +2071,8 @@ document.addEventListener('click',async e=>{
       PROF.list.forEach(p=>{if(p.key===PROF.cur)return;try{const st=JSON.parse(localStorage.getItem(p.key)||'null');if(st){st.pinHash=S.pinHash;localStorage.setItem(p.key,JSON.stringify(st));}}catch(e){}});
       toast('PIN geändert');break;}
     case 'lock':ui.unlocked=false;render();break;
-    case 'sec':ui.sec=ui.sec===d.k?'':d.k;render();break;
+    case 'sec':ui.sec=d.k;render();break;
+    case 'ppage':{ui.ppage=d.p;ui.sec=d.s||'';ui.kidMenu=false;ui.confirm=null;try{history.pushState({v:'parent',p:d.p},'');}catch(e){}render();if(!d.s)window.scrollTo(0,0);break;}
     case 'add-lang':{
       const n=val('#newlang').trim();if(!n){toast('Bitte einen Namen eingeben.');break;}
       const nl=newLang(n);S.langs.push(nl);S.activeLang=nl.id;save();render();toast(n+' angelegt');break;}
@@ -2221,6 +2242,7 @@ window.addEventListener('popstate',e=>{
   if(!({home:1,list:1,album:1,stats:1,options:1,parent:1})[v])v='home';
   if(Q&&Q.listening)stopListen();
   if(ui.view==='parent'&&v!=='parent')ui.unlocked=false;
+  if(v==='parent'&&e.state&&e.state.p){ui.ppage=e.state.p;ui.sec='';}
   popping=true;ui.view=v;ui.modal=null;ui.pinErr='';render();popping=false;
 });
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;});
